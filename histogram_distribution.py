@@ -11,7 +11,7 @@ def plot_cluster_distribution(file_path):
     base_name = os.path.basename(file_path)
     prefix = base_name.split('_')[0]
     os.makedirs(OUT_DIR, exist_ok=True)
-    out_filename = f"{prefix}_seq_id_distribution_histogram.png"
+    out_filename = f"{prefix}_seq_id_distribution_histogram1.png"
     out_path = os.path.join(OUT_DIR, out_filename)
     
     df = pd.read_csv(file_path, sep='\t', header=None) # TSV
@@ -31,8 +31,8 @@ def plot_cluster_distribution(file_path):
     bins = np.logspace(np.log10(1), np.log10(cluster_sizes.max()), 30)
 
     # Plot histogram of sizes
-    ax.hist(cluster_sizes, bins=bins,
-             color='skyblue', edgecolor='black', align='left')
+    ax.hist(cluster_sizes, bins=bins, histtype='step', linewidth=2,
+             color='skyblue', align='left')
 
     ax.set_xscale('log')
     ax.set_yscale('log')

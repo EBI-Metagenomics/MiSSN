@@ -3,6 +3,22 @@
 FASTA_FILE=$1
 TSV_FILE=$2
 
+if [ $# -lt 2 ];
+then
+        echo usage: $0 fasta_file cluster_tsv_file
+        exit 1
+fi
+
+if [ ! -f "$FASTA_FILE" ]; then
+        echo "Input FASTA file '$FASTA_FILE' not found."
+        exit 1
+fi
+
+if [ ! -f "$TSV_FILE" ]; then
+        echo "Input cluster TSV file '$TSV_FILE' not found."
+        exit 1
+fi
+
 OUT_DIR="separated_clusters"
 MIN_MEMBERS=5
 
@@ -28,10 +44,14 @@ awk -v out="$OUT_DIR" '
 	}
 ' "$OUT_DIR/target_clusters.txt" "$TSV_FILE"
 
+echo "Creating FASTA index using seqkit..."
+seqkit faidx "$FASTA_FILE"
+
 export FASTA_FILE
 export OUT_DIR
-cat "$OUT_DIR/target_clusters.txt" | xargs -I {} -P "$CORES" bash -c '
-	seqtk subseq "$FASTA_FILE" "$OUT_DIR/{}.lst" > "$OUT_DIR/{}.fasta"
+
+cat "$OUT_DIR/target_clusters.txt" | xargs -I {} -P 2 bash -c '
+	seqkit faidx "$FASTA_FILE" -l "$OUT_DIR/{}.lst" > "$OUT_DIR/{}.fasta"
 '
 
-echo "Clusters separated."
+echo "Clusters successfully separated in $OUT_DIR"

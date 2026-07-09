@@ -1,9 +1,11 @@
 dataset
 tmp
-separated_clusters/*
+separated_clusters
+biggest_cluster
 
 *.fasta
 *.tsv
 *.png
+*.dmnd
 
 diamond

@@ -2,9 +2,12 @@ dataset
 tmp
 separated_clusters
 biggest_cluster
+networks
 
 *.fasta
+*.csv
 *.tsv
+*.parquet
 *.png
 *.dmnd
 

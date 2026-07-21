@@ -1,99 +1,118 @@
-import pandas as pd
-import networkx as nx
-import numpy as np
+import argparse
+import duckdb
 import os
 import glob
-import gc
+import time
 
 edge_list_dir = "cluster_alignments"
-# TODO: param for this
-nodes_file = "dataset/gsoc_2026_test_set_nodes.csv"
 output_dir = "networks"
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--metadata-file", type=str, required=True, help="Path to the global metadata file"
+)
+parser.add_argument(
+    "--min_seq_id",
+    type=float,
+    required=True,
+    help="Minimum sequence identity threshold to keep an edge",
+)
+parser.add_argument(
+    "--min_coverage",
+    type=float,
+    required=True,
+    help="Minimum alignment coverage threshold to keep an edge",
+)
+
+args = parser.parse_args()
+
+metadata_file = args.metadata_file
+min_seq_id = args.min_seq_id
+min_coverage = args.min_coverage
 
 os.makedirs(output_dir, exist_ok=True)
 
-nodes_df = pd.read_csv(nodes_file, header=None, index_col=0, dtype=str).fillna("")
+# Initialize DuckDB
+conn = duckdb.connect()
 
-tsv_files = glob.glob(os.path.join(edge_list_dir, "*.tsv"))
-print(f"Found {len(tsv_files)} edge list tsv files to process.")
+print(f"[{time.strftime('%H:%M:%S')}] Loading metadata into DuckDB...")
+conn.execute(f"""
+CREATE TABLE global_nodes AS
+SELECT
+    mgyp AS id,
+    * EXCLUDE(mgyp)
+FROM read_parquet('{metadata_file}')
+""")
+
+tsv_files = glob.glob(os.path.join(edge_list_dir, "*.tsv")) + glob.glob(
+    os.path.join(edge_list_dir, "*.tsv.gz")
+)
+print(f"[{time.strftime('%H:%M:%S')}] Found {len(tsv_files)} edge lists to process.\n")
 
 for tsv_path in tsv_files:
-    base_name = os.path.basename(tsv_path).replace(".tsv", "")
-
-    # The input is in TSV
-    edges_df = pd.read_csv(tsv_path, sep="\t", header=None)
-
-    edges_df.rename(
-        columns={0: "source", 1: "destination", 2: "sequence_identity"}, inplace=True
-    )
-
-    # Remove self edges
-    # TODO: these are already removed by --no-self-hits
-    edges_df = edges_df[edges_df["source"] != edges_df["destination"]]
-
-    # Unify undirected edges
-    edges_df[["node_u", "node_v"]] = np.sort(
-        edges_df[["source", "destination"]], axis=1
-    )
-
-    # Keep only largest edges
-    edges_df = edges_df.sort_values("sequence_identity", ascending=False)
-    edges_df = edges_df.drop_duplicates(subset=["node_u", "node_v"], keep="first")
-
-    # TODO: keep only edges with condition met
-
-    G = nx.from_pandas_edgelist(
-        edges_df,
-        source="node_u",
-        target="node_v",
-        edge_attr="sequence_identity",
-        create_using=nx.Graph(),
-    )
-
-    cluster_nodes = list(G.nodes())
-
-    local_nodes_dict = nodes_df.loc[cluster_nodes].to_dict("index")
-
-    nx.set_node_attributes(G, local_nodes_dict)
+    base_name = os.path.basename(tsv_path).replace(".tsv.gz", "").replace(".tsv", "")
 
     network_dir = os.path.join(output_dir, base_name)
     os.makedirs(network_dir, exist_ok=True)
 
-    # Save graphml
-    nx.write_graphml(G, os.path.join(network_dir, f"{base_name}.graphml"))
+    # Process edges (filter, unify, deduplicate)
+    conn.execute(f"""
+    CREATE OR REPLACE TEMP TABLE unique_edges AS
+    SELECT
+        LEAST(qseqid, sseqid) AS source,
+        GREATEST(qseqid, sseqid) AS target,
+        MAX(pident) AS sequence_identity
+    FROM read_csv(
+        '{tsv_path}',
+        header=false,
+        delim='\\t',
+        auto_detect=true,
+        names=[
+            'qseqid',
+            'sseqid',
+            'pident',
+            'length',
+            'qlen',
+            'slen',
+            'positive',
+            'evalue',
+            'bitscore'
+        ]
+    )
+    WHERE qseqid != sseqid
+    AND pident >= {min_seq_id}
+    AND positive >= ({min_coverage} / 100.0) * GREATEST(qlen, slen)
+    GROUP BY source, target;
+    """)
 
-    # Save csv for Cosmograph
-    cosmograph_edges = edges_df[["node_u", "node_v", "sequence_identity"]].copy()
-    cosmograph_edges.rename(
-        columns={"node_u": "source", "node_v": "target"}, inplace=True
+    result = conn.execute("SELECT COUNT(*) FROM unique_edges").fetchone()
+    edge_count = result[0] if result else 0
+    print(f"[{time.strftime('%H:%M:%S')}] Extracted {edge_count:,} unique edges.")
+
+    # Extract active nodes
+    conn.execute("""
+    CREATE OR REPLACE TMP TABLE active_nodes AS
+    SELECT DISTINCT source AS id FROM unique_edges
+    UNION
+    SELECT DISTINCT target AS id FROM unique_edges
+    """)
+
+    # Export Cosmograph edges and nodes
+    conn.execute(
+        f"COPY unique_edges TO '{os.path.join(network_dir, f'{base_name}_edges.parquet')}' (FORMAT PARQUET)"
     )
 
-    cosmograph_edges.to_csv(
-        os.path.join(network_dir, f"{base_name}_edges.csv"), index=False
+    node_query = (
+        "SELECT g.* FROM global_nodes g SEMI JOIN active_nodes a ON g.id = a.id"
     )
-    cosmograph_edges.to_parquet(
-        os.path.join(network_dir, f"{base_name}_edges.parquet"), index=False
-    )
-
-    cluster_nodes = list(G.nodes())
-    cosmograph_nodes = nodes_df.loc[cluster_nodes].copy().reset_index()
-
-    cosmograph_nodes.rename(columns={cosmograph_nodes.columns[0]: "id"}, inplace=True)
-    cosmograph_nodes.columns = cosmograph_nodes.columns.astype(str)
-
-    cosmograph_nodes.to_csv(
-        os.path.join(network_dir, f"{base_name}_nodes.csv"), index=False
-    )
-    cosmograph_nodes.to_parquet(
-        os.path.join(network_dir, f"{base_name}_nodes.parquet"), index=False
+    conn.execute(
+        f"COPY ({node_query}) TO '{os.path.join(network_dir, f'{base_name}_nodes.parquet')}' (FORMAT PARQUET)"
     )
 
-    del edges_df
-    del G
-    del local_nodes_dict
-    del cosmograph_edges
-    del cosmograph_nodes
-    del cluster_nodes
-    gc.collect()
+    # Cleanup
+    conn.execute("DROP TABLE unique_edges")
+    conn.execute("DROP TABLE active_nodes")
 
-print(f"Successfully export GraphML, CSV and Parquet files into {output_dir}")
+print(
+    f"[{time.strftime('%H:%M:%S')}] Successfully exported all files into '{output_dir}'"
+)

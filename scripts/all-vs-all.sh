@@ -1,7 +1,17 @@
 #!/bin/bash
 
-export FASTA_DIR="separated_clusters_test"
-export OUT_DIR="cluster_alignments"
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 <fasta_dir> <out_dir>"
+  exit 1
+fi
+
+FASTA_DIR=$1
+OUT_DIR=$2
+
+if [ ! -d "$FASTA_DIR" ]; then
+  echo "Error: Folder containing fasta files not found: $FASTA_DIR"
+  exit 1
+fi
 
 mkdir -p "$OUT_DIR"
 
@@ -9,12 +19,12 @@ run_diamond() {
   FASTA_FILE=$1
   CLUSTER_NAME=$(basename "$FASTA_FILE" .fasta)
 
-  ./diamond makedb \
+  diamond makedb \
     --in "$FASTA_FILE" \
     --db "$OUT_DIR/${CLUSTER_NAME}" \
     --quiet
 
-  ./diamond blastp \
+  diamond blastp \
     --query "$FASTA_FILE" \
     --db "$OUT_DIR/${CLUSTER_NAME}.dmnd" \
     --out "$OUT_DIR/${CLUSTER_NAME}.tsv" \
@@ -29,10 +39,12 @@ run_diamond() {
 
 export -f run_diamond
 
-echo "Calculating DIAMOND alignments..."
+echo "[$(date +%H:%M:%S)] Calculating DIAMOND all-vs-all alignments..."
 
-for file in "$FASTA_DIR"/*.fasta; do
+for file in "$FASTA_DIR"/*.{fasta,fa,faa}; do
+  [ -e "$file" ] || continue
+
   run_diamond "$file"
 done
 
-echo "Alignments completed."
+echo "[$(date +%H:%M:%S)] Alignments completed."

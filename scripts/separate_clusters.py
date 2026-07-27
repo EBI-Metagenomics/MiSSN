@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-import sys
 import os
 import time
 import gzip
 import argparse
+from collections import defaultdict
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 
 def open_text(filepath):
@@ -14,26 +15,59 @@ def open_text(filepath):
     )
 
 
-def open_binary(filepath):
-    """Opens a file in binary mode, required for fast line counting."""
-    return (
-        gzip.open(filepath, "rb") if filepath.endswith(".gz") else open(filepath, "rb")
+def load_cluster_mapping(tsv_file, min_size):
+    """Reads the cluster mapping TSV and returns sequence-to-cluster mapping and valid clusters after filtering."""
+    print(f"[{time.strftime('%H:%M:%S')}] Loading cluster mapping into memory...")
+    seq_to_cluster = {}
+    cluster_counts = {}
+
+    # Read TSV and map sequences to clusters
+    with open_text(tsv_file) as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                cluster_id, seq_id = parts[0], parts[1]
+                seq_to_cluster[seq_id] = cluster_id
+                cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
+
+    # Filter for clusters with at least min_size members
+    valid_clusters = {cid for cid, count in cluster_counts.items() if count >= min_size}
+    print(f"\tFound {len(valid_clusters):,} valid clusters with >={min_size} members.")
+
+    return seq_to_cluster, valid_clusters
+
+
+def group_sequences(fasta_file, seq_to_cluster, valid_clusters):
+    """Streams the FASTA file and groups valid sequences by cluster in memory."""
+    print(f"[{time.strftime('%H:%M:%S')}] Grouping valid sequences in memory...")
+
+    # Group all sequence strings by their cluster ID
+    cluster_data = defaultdict(list)
+
+    # Stream the FASTA file
+    with open_text(fasta_file) as f:
+        for title, seq in SimpleFastaParser(f):  # Biopython's fast parser
+            protein_id = title.split()[0]
+
+            cluster_id = seq_to_cluster.get(protein_id)
+            if cluster_id in valid_clusters:
+                # Reconstruct the FASTA format and save it to memory
+                fasta_string = f">{title}\n{seq}\n"
+                cluster_data[cluster_id].append(fasta_string)
+
+    return cluster_data
+
+
+def write_cluster_files(cluster_data, out_dir):
+    """Writes grouped cluster sequences into individual FASTA files."""
+    print(
+        f"[{time.strftime('%H:%M:%S')}] Writing {len(cluster_data):,} cluster files to disk..."
     )
 
-
-def count_lines(filepath):
-    """Counts lines in a file quickly using binary mode."""
-    with open_binary(filepath) as f:
-        return sum(1 for _ in f)
-
-
-def flush_sequence(out_dir, cluster_id, valid_clusters, seq_data):
-    """Write a full sequence to disk in one I/O operation."""
-    if cluster_id and cluster_id in valid_clusters:
+    for cluster_id, seq_lines in cluster_data.items():
         out_path = os.path.join(out_dir, f"{cluster_id}.fasta")
-        # Open in append mode ('a'), write the whole sequence chunk, and close
-        with open(out_path, "a") as out_f:
-            out_f.write("".join(seq_data))
+        with open(out_path, "w") as out_f:
+            out_f.write("".join(seq_lines))
 
 
 if __name__ == "__main__":
@@ -62,73 +96,8 @@ if __name__ == "__main__":
     out_dir = os.path.join(args.out_dir, "separated_clusters")
     os.makedirs(out_dir, exist_ok=True)
 
-    print(f"[{time.strftime('%H:%M:%S')}] Loading cluster mapping into memory...")
-    seq_to_cluster = {}
-    cluster_counts = {}
+    seq_to_cluster, valid_clusters = load_cluster_mapping(args.tsv_file, args.min_size)
+    cluster_data = group_sequences(args.fasta_file, seq_to_cluster, valid_clusters)
+    write_cluster_files(cluster_data, out_dir)
 
-    # Read TSV and map sequences to clusters
-    with open_text(args.tsv_file) as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 2:
-                cluster_id, seq_id = parts[0], parts[1]
-                seq_to_cluster[seq_id] = cluster_id
-                cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
-
-    # Filter for clusters with at least min_size members
-    valid_clusters = {
-        cid for cid, count in cluster_counts.items() if count >= args.min_size
-    }
-    print(
-        f"\tFound {len(valid_clusters):,} valid clusters with >={args.min_size} members."
-    )
-
-    print(f"[{time.strftime('%H:%M:%S')}] Calculating total lines in FASTA file...")
-    total_lines = count_lines(args.fasta_file)
-    print(f"\tTotal lines to process: {total_lines:,}.")
-    print(
-        f"[{time.strftime('%H:%M:%S')}] Extracting sequences into individual files in '{out_dir}'..."
-    )
-
-    current_cluster = None
-    current_seq_data = []
-    processed_lines = 0
-
-    # Stream the FASTA file line-by-line
-    with open_text(args.fasta_file) as f:
-        for line in f:
-            processed_lines += 1
-
-            # Print a live progress update every 100,000 lines
-            if processed_lines % 100000 == 0:
-                percent = (processed_lines / total_lines) * 100
-                sys.stderr.write(
-                    f"\r\tProgress: {processed_lines:,} / {total_lines:,} lines ({percent:.1f}%) completed..."
-                )
-                sys.stderr.flush()
-
-            if line.startswith(">"):
-                # A new sequence has started. Save the previous one to the hard drive.
-                flush_sequence(
-                    out_dir, current_cluster, valid_clusters, current_seq_data
-                )
-
-                # Extract the sequence ID (ignoring the '>' and any descriptions)
-                seq_id = line.strip().split()[0][1:]
-                current_cluster = seq_to_cluster.get(seq_id)
-                current_seq_data = [line]  # Start storing the new sequence in memory
-            else:
-                # If it's part of a valid cluster, keep storing the amino acid lines
-                if current_cluster:
-                    current_seq_data.append(line)
-
-    # Flush the very last sequence in the file
-    flush_sequence(out_dir, current_cluster, valid_clusters, current_seq_data)
-
-    sys.stderr.write(
-        f"\r\tProgress: {total_lines:,} / {total_lines:,} lines (100.0%) completed.\n"
-    )
-
-    print(
-        f"[{time.strftime('%H:%M:%S')}] Generated {len(valid_clusters):,} FASTA files in '{out_dir}'."
-    )
+    print(f"[{time.strftime('%H:%M:%S')}] Generated FASTA files in '{out_dir}'.")

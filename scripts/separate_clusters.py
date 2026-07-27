@@ -8,6 +8,14 @@ from collections import defaultdict
 from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 
+def check_positive_int(value):
+    """Ensures the input is a valid non-negative integer."""
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"Minimum size cannot be negative: {value}")
+    return ivalue
+
+
 def open_text(filepath):
     """Opens a file in text mode, automatically decompressing if it's a .gz file."""
     return (
@@ -76,17 +84,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "-f",
         "--fasta-file",
+        type=str,
         required=True,
         help="Path to the input FASTA file (can be .gz)",
     )
     parser.add_argument(
-        "-t", "--tsv-file", required=True, help="Path to the cluster mapping TSV file"
+        "-t",
+        "--tsv-file",
+        type=str,
+        required=True,
+        help="Path to the cluster mapping TSV file",
     )
-    parser.add_argument("-o", "--out-dir", required=True, help="Output directory")
+    parser.add_argument(
+        "-o", "--out-dir", type=str, required=True, help="Output directory"
+    )
     parser.add_argument(
         "-s",
         "--min-size",
-        type=int,
+        type=check_positive_int,
         required=True,
         help="Minimum number of members required to extract a cluster",
     )

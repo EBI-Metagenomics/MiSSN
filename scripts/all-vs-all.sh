@@ -49,6 +49,8 @@ export -f run_diamond
 
 echo "[$(date +%H:%M:%S)] Calculating DIAMOND all-vs-all alignments..."
 
+#TODO: needs chunking by 1000s in folders like 1 2 3 4 5
+
 for file in "$FASTA_DIR"/*.{fasta,fa,faa}; do
   [ -e "$file" ] || continue
 

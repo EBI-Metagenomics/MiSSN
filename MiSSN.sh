@@ -1,28 +1,38 @@
+#!/bin/bash
 # MiSSN: A tool for generating MGnify interactive Sequence Similarity Networks
 
-if [ $# -lt 5 ]; then
-  echo "Usage: $0 <fasta_file> <metadata_file> <min_seq_id> <min_coverage> <min_cluster_size> [out_dir]"
+while getopts "f:m:i:c:s:o:" option; do
+  case $option in
+  f) FASTA_FILE=$OPTARG ;;
+  m) METADATA_FILE=$OPTARG ;;
+  i) MIN_SEQ_ID=$OPTARG ;;
+  c) MIN_COVERAGE=$OPTARG ;;
+  s) MIN_CLUSTER_SIZE=$OPTARG ;;
+  o) OUT_DIR=$OPTARG ;;
+  *)
+    echo "Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>]" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [ -z "$FASTA_FILE" ] || [ -z "$METADATA_FILE" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ] || [ -z "$MIN_CLUSTER_SIZE" ]; then
+  echo "Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>]" >&2
   exit 1
 fi
-
-FASTA_FILE=$1
-METADATA_FILE=$2
-MIN_SEQ_ID=$3
-MIN_COVERAGE=$4
-MIN_CLUSTER_SIZE=$5
 
 if [ ! -f "$FASTA_FILE" ]; then
-  echo "Input FASTA file '$FASTA_FILE' not found."
+  echo "Error: Input FASTA file '$FASTA_FILE' not found." >&2
   exit 1
 fi
 
-if [ -z "$MIN_SEQ_ID" ] || ! [[ "$MIN_SEQ_ID" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-  echo "Given min-seq-id ($MIN_SEQ_ID) is not a valid number between 0.0 and 1.0."
+if ! [[ "$MIN_SEQ_ID" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+  echo "Error: Given min-seq-id ($MIN_SEQ_ID) is not a valid number between 0.0 and 1.0." >&2
   exit 1
 fi
 
-if [ -z "$MIN_COVERAGE" ] || ! [[ "$MIN_COVERAGE" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-  echo "Given min-coverage ($MIN_COVERAGE) is not a valid number between 0.0 and 1.0."
+if ! [[ "$MIN_COVERAGE" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+  echo "Error: Given min-coverage ($MIN_COVERAGE) is not a valid number between 0.0 and 1.0." >&2
   exit 1
 fi
 
@@ -34,9 +44,8 @@ fi
 FILENAME=$(basename "$FASTA_FILE")
 BASENAME=$(echo "$FILENAME" | sed -E 's/\.(fasta|fa|faa)(\.gz)?$//')
 
-if [ -n "$6" ]; then
-  OUT_DIR="$6"
-else
+# Set default output directory if -o was not provided
+if [ -z "$OUT_DIR" ]; then
   OUT_DIR="$BASENAME"
 fi
 
@@ -46,22 +55,22 @@ if [ -d "$OUT_DIR" ]; then
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     rm -rf "$OUT_DIR"
   else
-    echo "Aborted by user."
-    exit
+    echo "Aborted by user." >&2
+    exit 1
   fi
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-"$SCRIPT_DIR/scripts/linclust.sh" "$FASTA_FILE" "$MIN_SEQ_ID" "$MIN_COVERAGE" "$OUT_DIR"
+"$SCRIPT_DIR/scripts/linclust.sh" -f "$FASTA_FILE" -i "$MIN_SEQ_ID" -c "$MIN_COVERAGE" -o "$OUT_DIR"
 
 TSV_FILE="$OUT_DIR/linclust_results/${BASENAME}_cluster.tsv"
-"$SCRIPT_DIR/scripts/separate_clusters.py" "$FASTA_FILE" "$TSV_FILE" "$OUT_DIR" --min-size "$MIN_CLUSTER_SIZE"
+"$SCRIPT_DIR/scripts/separate_clusters.py" -f "$FASTA_FILE" -t "$TSV_FILE" -o "$OUT_DIR" -s "$MIN_CLUSTER_SIZE"
 
 SEPARATED_CLUSTERS_DIR="$OUT_DIR/separated_clusters"
 CLUSTER_ALIGNMENTS_DIR="$OUT_DIR/cluster_alignments"
 NETWORKS_DIR="$OUT_DIR/networks"
 
-"$SCRIPT_DIR/scripts/all-vs-all.sh" "$SEPARATED_CLUSTERS_DIR" "$CLUSTER_ALIGNMENTS_DIR"
+"$SCRIPT_DIR/scripts/all-vs-all.sh" -f "$SEPARATED_CLUSTERS_DIR" -o "$CLUSTER_ALIGNMENTS_DIR"
 
-"$SCRIPT_DIR/scripts/build_ssn.py" "$CLUSTER_ALIGNMENTS_DIR" "$METADATA_FILE" "$NETWORKS_DIR" --min-seq-id "$MIN_SEQ_ID" --min-coverage "$MIN_COVERAGE"
+"$SCRIPT_DIR/scripts/build_ssn.py" -e "$CLUSTER_ALIGNMENTS_DIR" -m "$METADATA_FILE" -i "$MIN_SEQ_ID" -c "$MIN_COVERAGE" -o "$NETWORKS_DIR"

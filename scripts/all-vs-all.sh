@@ -1,15 +1,23 @@
 #!/bin/bash
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 <fasta_dir> <out_dir>"
+while getopts "f:o:" option; do
+  case $option in
+  f) FASTA_DIR=$OPTARG ;;
+  o) OUT_DIR=$OPTARG ;;
+  *)
+    echo "Usage: $0 -f <fasta_dir> -o <out_dir>" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [ -z "$FASTA_DIR" ] || [ -z "$OUT_DIR" ]; then
+  echo "Usage: $0 -f <fasta_dir> -o <out_dir>" >&2
   exit 1
 fi
 
-FASTA_DIR=$1
-OUT_DIR=$2
-
 if [ ! -d "$FASTA_DIR" ]; then
-  echo "Error: Folder containing fasta files not found: $FASTA_DIR"
+  echo "Error: Folder '$FASTA_DIR' containing fasta files not found." >&2
   exit 1
 fi
 
@@ -40,6 +48,8 @@ run_diamond() {
 export -f run_diamond
 
 echo "[$(date +%H:%M:%S)] Calculating DIAMOND all-vs-all alignments..."
+
+#TODO: needs chunking by 1000s in folders like 1 2 3 4 5
 
 for file in "$FASTA_DIR"/*.{fasta,fa,faa}; do
   [ -e "$file" ] || continue

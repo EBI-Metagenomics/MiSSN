@@ -39,10 +39,18 @@ def flush_sequence(out_dir, cluster_id, valid_clusters, seq_data):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("fasta_file", help="Path to the input FASTA file (can be .gz)")
-    parser.add_argument("tsv_file", help="Path to the cluster mapping TSV file")
-    parser.add_argument("out_dir", help="Output directory")
     parser.add_argument(
+        "-f",
+        "--fasta-file",
+        required=True,
+        help="Path to the input FASTA file (can be .gz)",
+    )
+    parser.add_argument(
+        "-t", "--tsv-file", required=True, help="Path to the cluster mapping TSV file"
+    )
+    parser.add_argument("-o", "--out-dir", required=True, help="Output directory")
+    parser.add_argument(
+        "-s",
         "--min-size",
         type=int,
         required=True,

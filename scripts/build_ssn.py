@@ -111,31 +111,39 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "edge_list_dir",
+        "-e",
+        "--edge-list-dir",
         type=str,
+        required=True,
         help="Directory containing edge lists",
     )
     parser.add_argument(
-        "metadata_file",
+        "-m",
+        "--metadata-file",
         type=str,
+        required=True,
         help="Path to the global metadata file",
     )
     parser.add_argument(
-        "out_dir",
-        type=str,
-        help="Output directory",
-    )
-    parser.add_argument(
+        "-i",
         "--min-seq-id",
         type=float,
         required=True,
         help="Minimum sequence identity threshold to keep an edge (0.0 to 1.0)",
     )
     parser.add_argument(
+        "-c",
         "--min-coverage",
         type=float,
         required=True,
         help="Minimum alignment coverage threshold to keep an edge (0.0 to 1.0)",
+    )
+    parser.add_argument(
+        "-o",
+        "--out-dir",
+        type=str,
+        required=True,
+        help="Output directory",
     )
 
     args = parser.parse_args()

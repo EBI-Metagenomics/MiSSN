@@ -8,6 +8,14 @@ from pathlib import Path
 import time
 
 
+def check_positive_int(value):
+    """Ensures the input is a valid non-negative integer."""
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"Minimum size cannot be negative: {value}")
+    return ivalue
+
+
 def open_text(filepath):
     """Opens a file in text mode, automatically decompressing if it's a .gz file."""
     return (

@@ -56,8 +56,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/scripts/linclust.sh" "$FASTA_FILE" "$MIN_SEQ_ID" "$MIN_COVERAGE" "$OUT_DIR"
 
 TSV_FILE="$OUT_DIR/linclust_results/${BASENAME}_cluster.tsv"
-python3 "$SCRIPT_DIR/scripts/separate_clusters.py" "$FASTA_FILE" "$TSV_FILE" "$OUT_DIR" --min-size "$MIN_CLUSTER_SIZE"
+"$SCRIPT_DIR/scripts/separate_clusters.py" "$FASTA_FILE" "$TSV_FILE" "$OUT_DIR" --min-size "$MIN_CLUSTER_SIZE"
 
-"$SCRIPT_DIR/scripts/all-vs-all.sh" "$OUT_DIR/separated_clusters" "$OUT_DIR/cluster_alignments"
+SEPARATED_CLUSTERS_DIR="$OUT_DIR/separated_clusters"
+CLUSTER_ALIGNMENTS_DIR="$OUT_DIR/cluster_alignments"
+NETWORKS_DIR="$OUT_DIR/networks"
 
-python3 "$SCRIPT_DIR/scripts/build_ssn.py" "$OUT_DIR/cluster_alignments" "$METADATA_FILE" "$OUT_DIR/networks" --min-seq-id "$MIN_SEQ_ID" --min-coverage "$MIN_COVERAGE"
+"$SCRIPT_DIR/scripts/all-vs-all.sh" "$SEPARATED_CLUSTERS_DIR" "$CLUSTER_ALIGNMENTS_DIR"
+
+"$SCRIPT_DIR/scripts/build_ssn.py" "$CLUSTER_ALIGNMENTS_DIR" "$METADATA_FILE" "$NETWORKS_DIR" --min-seq-id "$MIN_SEQ_ID" --min-coverage "$MIN_COVERAGE"

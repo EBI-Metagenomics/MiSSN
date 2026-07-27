@@ -53,11 +53,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-"$SCRIPT_DIR/scripts/linclust.sh" "$FASTA_FILE" "$MIN_SEQ_ID" "$OUT_DIR"
-
-# TODO: Plot and user feedback, take in number
-# python3 boxplot_distribution.py gsoc_2026_test_set_full_length/linclust_results/gsoc_2026_test_set_full_length_cluster.tsv -o gsoc_2026_test_set_full_length/
-#
+"$SCRIPT_DIR/scripts/linclust.sh" "$FASTA_FILE" "$MIN_SEQ_ID" "$MIN_COVERAGE" "$OUT_DIR"
 
 TSV_FILE="$OUT_DIR/linclust_results/${BASENAME}_cluster.tsv"
 python3 "$SCRIPT_DIR/scripts/separate_clusters.py" "$FASTA_FILE" "$TSV_FILE" "$OUT_DIR" --min-size "$MIN_CLUSTER_SIZE"

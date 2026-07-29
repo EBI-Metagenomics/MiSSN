@@ -30,12 +30,13 @@ def load_cluster_mapping(tsv_file, min_size):
     cluster_counts = {}
 
     # Read TSV and map sequences to clusters
+    # For example: MGYP007654976183 MGYP007331563105 (cluster_id, protein_id)
     with open_text(tsv_file) as f:
         for line in f:
             parts = line.strip().split()
             if len(parts) >= 2:
-                cluster_id, seq_id = parts[0], parts[1]
-                seq_to_cluster[seq_id] = cluster_id
+                cluster_id, protein_id = parts[0], parts[1]
+                seq_to_cluster[protein_id] = cluster_id
                 cluster_counts[cluster_id] = cluster_counts.get(cluster_id, 0) + 1
 
     # Filter for clusters with at least min_size members

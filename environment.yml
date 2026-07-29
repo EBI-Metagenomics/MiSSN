@@ -1,4 +1,4 @@
-name: missn_pipeline
+name: missn
 channels:
   - conda-forge
   - bioconda

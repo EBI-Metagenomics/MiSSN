@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import os
-import time
-import gzip
 import argparse
-from collections import defaultdict
 from Bio.SeqIO.FastaIO import SimpleFastaParser
+from collections import defaultdict
+import gzip
+from pathlib import Path
+import time
 
 
 def check_positive_int(value):
@@ -19,7 +19,7 @@ def check_positive_int(value):
 def open_text(filepath):
     """Opens a file in text mode, automatically decompressing if it's a .gz file."""
     return (
-        gzip.open(filepath, "rt") if filepath.endswith(".gz") else open(filepath, "r")
+        gzip.open(filepath, "rt") if filepath.suffix == ".gz" else open(filepath, "r")
     )
 
 
@@ -73,7 +73,7 @@ def write_cluster_files(cluster_data, out_dir):
     )
 
     for cluster_id, seq_lines in cluster_data.items():
-        out_path = os.path.join(out_dir, f"{cluster_id}.fasta")
+        out_path = out_dir / f"{cluster_id}.fasta"
         with open(out_path, "w") as out_f:
             out_f.write("".join(seq_lines))
 
@@ -84,19 +84,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "-f",
         "--fasta-file",
-        type=str,
+        type=Path,
         required=True,
         help="Path to the input FASTA file (can be .gz)",
     )
     parser.add_argument(
         "-t",
         "--tsv-file",
-        type=str,
+        type=Path,
         required=True,
         help="Path to the cluster mapping TSV file",
     )
     parser.add_argument(
-        "-o", "--out-dir", type=str, required=True, help="Output directory"
+        "-o", "--out-dir", type=Path, required=True, help="Output directory"
     )
     parser.add_argument(
         "-s",
@@ -108,8 +108,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.out_dir, "separated_clusters")
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = args.out_dir / "separated_clusters"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     seq_to_cluster, valid_clusters = load_cluster_mapping(args.tsv_file, args.min_size)
     cluster_data = group_sequences(args.fasta_file, seq_to_cluster, valid_clusters)

@@ -2,8 +2,7 @@
 
 import argparse
 import duckdb
-import os
-import glob
+from pathlib import Path
 import time
 
 
@@ -19,7 +18,7 @@ def process_networks(edge_list_dir, metadata_file, min_seq_id, min_coverage, out
             f"Given min_coverage ({min_coverage}) is not a valid number between 0.0 and 1.0."
         )
 
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize DuckDB
     conn = duckdb.connect()
@@ -30,21 +29,17 @@ def process_networks(edge_list_dir, metadata_file, min_seq_id, min_coverage, out
     SELECT
         mgyp AS id,
         * EXCLUDE(mgyp)
-    FROM read_parquet('{metadata_file}')
+    FROM read_parquet('{metadata_file.as_posix()}')
     """)
 
-    tsv_files = glob.glob(os.path.join(edge_list_dir, "*.tsv")) + glob.glob(
-        os.path.join(edge_list_dir, "*.tsv.gz")
-    )
+    tsv_files = list(edge_list_dir.glob("*.tsv")) + list(edge_list_dir.glob("*.tsv.gz"))
     print(f"\tFound {len(tsv_files)} edge lists to process.")
 
     for tsv_path in tsv_files:
-        base_name = (
-            os.path.basename(tsv_path).replace(".tsv.gz", "").replace(".tsv", "")
-        )
+        base_name = tsv_path.name.replace(".tsv.gz", "").replace(".tsv", "")
 
-        network_dir = os.path.join(out_dir, base_name)
-        os.makedirs(network_dir, exist_ok=True)
+        network_dir = out_dir / base_name
+        network_dir.mkdir(parents=True, exist_ok=True)
 
         # Process edges (filter, unify, deduplicate)
         conn.execute(f"""
@@ -54,7 +49,7 @@ def process_networks(edge_list_dir, metadata_file, min_seq_id, min_coverage, out
             GREATEST(qseqid, sseqid) AS target,
             MAX(pident) AS sequence_identity
         FROM read_csv(
-            '{tsv_path}',
+            '{tsv_path.as_posix()}',
             header=false,
             delim='\\t',
             auto_detect=true,
@@ -79,24 +74,24 @@ def process_networks(edge_list_dir, metadata_file, min_seq_id, min_coverage, out
         # Extract active nodes
         conn.execute("""
         CREATE OR REPLACE TEMP TABLE active_nodes AS
-        SELECT DISTINCT source AS id FROM unique_edges
-        UNION
-        SELECT DISTINCT target AS id FROM unique_edges
+        SELECT g.*
+        FROM global_nodes g
+        SEMI JOIN (
+            SELECT source AS id FROM unique_edges
+            UNION
+            SELECT target AS id FROM unique_edges
+        ) a ON g.id = a.id
         """)
 
         # TODO: add color column to the parquet?
 
         # Export Cosmograph edges and nodes
-        conn.execute(
-            f"COPY unique_edges TO '{os.path.join(network_dir, f'{base_name}_edges.parquet')}' (FORMAT PARQUET)"
-        )
+        edge_file = network_dir / f"{base_name}_edges.parquet"
+        node_file = network_dir / f"{base_name}_nodes.parquet"
 
-        node_query = (
-            "SELECT g.* FROM global_nodes g SEMI JOIN active_nodes a ON g.id = a.id"
-        )
-        conn.execute(
-            f"COPY ({node_query}) TO '{os.path.join(network_dir, f'{base_name}_nodes.parquet')}' (FORMAT PARQUET)"
-        )
+        conn.execute(f"COPY unique_edges TO '{edge_file.as_posix()}' (FORMAT PARQUET)")
+
+        conn.execute(f"COPY active_nodes TO '{node_file.as_posix()}' (FORMAT PARQUET)")
 
         # Cleanup
         conn.execute("DROP TABLE unique_edges")
@@ -113,14 +108,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-e",
         "--edge-list-dir",
-        type=str,
+        type=Path,
         required=True,
         help="Directory containing edge lists",
     )
     parser.add_argument(
         "-m",
         "--metadata-file",
-        type=str,
+        type=Path,
         required=True,
         help="Path to the global metadata file",
     )
@@ -141,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--out-dir",
-        type=str,
+        type=Path,
         required=True,
         help="Output directory",
     )

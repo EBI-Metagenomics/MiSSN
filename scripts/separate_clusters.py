@@ -8,14 +8,6 @@ from pathlib import Path
 import time
 
 
-def check_positive_int(value):
-    """Ensures the input is a valid non-negative integer."""
-    ivalue = int(value)
-    if ivalue < 0:
-        raise argparse.ArgumentTypeError(f"Minimum size cannot be negative: {value}")
-    return ivalue
-
-
 def open_text(filepath):
     """Opens a file in text mode, automatically decompressing if it's a .gz file."""
     return (
@@ -102,7 +94,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s",
         "--min-size",
-        type=check_positive_int,
+        type=lambda x: (
+            int(x)
+            if int(x) >= 0
+            else (_ for _ in ()).throw(
+                argparse.ArgumentTypeError("Must be non-negative")
+            )
+        ),
         required=True,
         help="Minimum number of members required to extract a cluster",
     )

@@ -1,7 +1,35 @@
 #!/bin/bash
-# MiSSN: A tool for generating MGnify interactive Sequence Similarity Networks
+# MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
 
-while getopts "f:m:i:c:s:o:" option; do
+usage() {
+  echo "Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]" >&2
+  echo "Try '$0 -h' for more information." >&2
+  exit 1
+}
+
+print_help() {
+  cat <<EOF
+MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
+
+Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
+
+Required arguments:
+  -f    Path to the input FASTA file (can be .gz).
+  -m    Path to the global metadata Parquet file.
+  -i    Minimum sequence identity threshold to keep an edge (0.0 to 1.0).
+  -c    Minimum alignment coverage threshold to keep an edge (0.0 to 1.0).
+  -s    Minimum number of members required to extract a cluster.
+
+Optional arguments:
+  -o    Output directory. (Default: dynamically named based on the FASTA file).
+  -g    Number of leading lineage parts for color grouping. (Default: 4).
+  -h    Show this help message and exit.
+EOF
+
+  exit 0
+}
+
+while getopts "f:m:i:c:s:o:g:h" option; do
   case $option in
   f) FASTA_FILE=$OPTARG ;;
   m) METADATA_FILE=$OPTARG ;;
@@ -9,16 +37,14 @@ while getopts "f:m:i:c:s:o:" option; do
   c) MIN_COVERAGE=$OPTARG ;;
   s) MIN_CLUSTER_SIZE=$OPTARG ;;
   o) OUT_DIR=$OPTARG ;;
-  *)
-    echo "Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>]" >&2
-    exit 1
-    ;;
+  g) COLOR_GROUP_PARTS=$OPTARG ;;
+  h) print_help ;;
+  *) usage ;;
   esac
 done
 
 if [ -z "$FASTA_FILE" ] || [ -z "$METADATA_FILE" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ] || [ -z "$MIN_CLUSTER_SIZE" ]; then
-  echo "Usage: $0 -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>]" >&2
-  exit 1
+  usage
 fi
 
 if [ ! -f "$FASTA_FILE" ]; then
@@ -49,6 +75,10 @@ if [ -z "$OUT_DIR" ]; then
   OUT_DIR="$BASENAME"
 fi
 
+if [ -z "$COLOR_GROUP_PARTS" ]; then
+  COLOR_GROUP_PARTS=4
+fi
+
 # If output directory already exists delete and recreate it
 if [ -d "$OUT_DIR" ]; then
   read -p "Output directory '$OUT_DIR' already exists. Do you want to overwrite it? (y/N): " -r
@@ -73,4 +103,4 @@ NETWORKS_DIR="$OUT_DIR/networks"
 
 "$SCRIPT_DIR/scripts/all-vs-all.sh" -f "$SEPARATED_CLUSTERS_DIR" -o "$CLUSTER_ALIGNMENTS_DIR"
 
-"$SCRIPT_DIR/scripts/build_ssn.py" -e "$CLUSTER_ALIGNMENTS_DIR" -m "$METADATA_FILE" -i "$MIN_SEQ_ID" -c "$MIN_COVERAGE" -o "$NETWORKS_DIR"
+"$SCRIPT_DIR/scripts/build_ssn.py" -e "$CLUSTER_ALIGNMENTS_DIR" -m "$METADATA_FILE" -i "$MIN_SEQ_ID" -c "$MIN_COVERAGE" -o "$NETWORKS_DIR" -g "$COLOR_GROUP_PARTS"

@@ -228,6 +228,7 @@ def setup_biome_colors(conn, group_parts):
         formatted_colors.append((raw_lin, f"rgb({r},{g},{b})"))
 
     color_df = pd.DataFrame(formatted_colors, columns=pd.Index(["biome", "color"]))
+    color_df = color_df.astype('string')
 
     conn.register("color_lookup", color_df)
     conn.execute(
@@ -242,31 +243,35 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
     """
     base_name = tsv_path.name.replace(".tsv.gz", "").replace(".tsv", "")
 
+    # Load raw edges to capture all sequences
+    try:
+        conn.execute(f"""
+        CREATE OR REPLACE TEMP TABLE raw_edges AS
+        SELECT *
+        FROM read_csv(
+            '{tsv_path.as_posix()}',
+            header=false,
+            delim='\\t',
+            auto_detect=true,
+            names=[
+                'qseqid',
+                'sseqid',
+                'pident',
+                'length',
+                'qlen',
+                'slen',
+                'positive',
+                'evalue',
+                'bitscore'
+            ]
+        )
+        """)
+    except duckdb.InvalidInputException:
+        print(f"\tSkipping empty or invalid file: {tsv_path.name}")
+        return
+
     network_dir = out_dir / base_name
     network_dir.mkdir(parents=True, exist_ok=True)
-
-    # Load raw edges to capture all sequences
-    conn.execute(f"""
-    CREATE OR REPLACE TEMP TABLE raw_edges AS
-    SELECT *
-    FROM read_csv(
-        '{tsv_path.as_posix()}',
-        header=false,
-        delim='\\t',
-        auto_detect=true,
-        names=[
-            'qseqid',
-            'sseqid',
-            'pident',
-            'length',
-            'qlen',
-            'slen',
-            'positive',
-            'evalue',
-            'bitscore'
-        ]
-    )
-    """)
 
     conn.execute(f"""
     CREATE OR REPLACE TEMP TABLE unique_edges AS

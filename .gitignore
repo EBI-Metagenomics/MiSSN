@@ -1,10 +1,15 @@
 dataset
 tmp
+cluster_alignments
+linclust_results
 separated_clusters
-biggest_cluster
+plots
+networks
 
 *.fasta
+*.csv
 *.tsv
+*.parquet
 *.png
 *.dmnd
 

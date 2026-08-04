@@ -1,11 +1,16 @@
-dataset
-tmp
+# Output directories
+cluster_alignments
+linclust_results
 separated_clusters
-biggest_cluster
+networks
 
+# Data files
 *.fasta
+*.csv
 *.tsv
-*.png
+*.parquet
 *.dmnd
+*.gz
 
-diamond
+# Jupyter notebooks
+.ipynb_checkpoints/

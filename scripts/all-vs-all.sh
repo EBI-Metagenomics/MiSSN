@@ -24,8 +24,8 @@ fi
 mkdir -p "$OUT_DIR"
 
 run_diamond() {
-  FASTA_FILE=$1
-  CLUSTER_NAME=$(basename "$FASTA_FILE" .fasta)
+  local FASTA_FILE=$1
+  local CLUSTER_NAME=$(basename "$FASTA_FILE" .fasta)
 
   diamond makedb \
     --in "$FASTA_FILE" \

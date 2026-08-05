@@ -228,7 +228,7 @@ def setup_biome_colors(conn, group_parts):
         formatted_colors.append((raw_lin, f"rgb({r},{g},{b})"))
 
     color_df = pd.DataFrame(formatted_colors, columns=pd.Index(["biome", "color"]))
-    color_df = color_df.astype('string')
+    color_df = color_df.astype("string")
 
     conn.register("color_lookup", color_df)
     conn.execute(
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-g",
-        "--group-parts",
+        "--color-group-parts",
         type=lambda x: (
             int(x)
             if int(x) >= 2
@@ -408,6 +408,6 @@ if __name__ == "__main__":
         metadata_file=args.metadata_file,
         min_seq_id=args.min_seq_id,
         min_coverage=args.min_coverage,
-        group_parts=args.group_parts,
+        group_parts=args.color_group_parts,
         out_dir=args.out_dir,
     )

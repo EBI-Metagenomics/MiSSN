@@ -4,12 +4,7 @@
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=100G
 
-. /hps/software/users/rdf/metagenomics/service-team/repos/mi-automation/team_environments/codon/mitrc.sh
-mitload load_micromamba
-eval "$(micromamba shell hook --shell bash)"
-micromamba activate duckdb-test
-
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 if [ -f "$SLURM_SUBMIT_DIR/scripts/build_ssn.py" ]; then
   PYTHON_SCRIPT="$SLURM_SUBMIT_DIR/scripts/build_ssn.py"
 elif [ -f "$SLURM_SUBMIT_DIR/../scripts/build_ssn.py" ]; then
@@ -21,16 +16,16 @@ fi
 
 while getopts "e:m:o:i:c:g:" option; do
   case $option in
-    e) EDGE_LIST_DIR=$OPTARG ;;
-    m) METADATA_FILE=$OPTARG ;;
-    o) OUT_DIR=$OPTARG ;;
-    i) MIN_SEQ_ID=$OPTARG ;;
-    c) MIN_COVERAGE=$OPTARG ;;
-    g) GROUP_PARTS=$OPTARG ;;
-    *)
-      echo "Usage: sbatch $0 -e <edge_list_dir> -m <metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
-      exit 1
-      ;;
+  e) EDGE_LIST_DIR=$OPTARG ;;
+  m) METADATA_FILE=$OPTARG ;;
+  o) OUT_DIR=$OPTARG ;;
+  i) MIN_SEQ_ID=$OPTARG ;;
+  c) MIN_COVERAGE=$OPTARG ;;
+  g) GROUP_PARTS=$OPTARG ;;
+  *)
+    echo "Usage: sbatch $0 -e <edge_list_dir> -m <metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
+    exit 1
+    ;;
   esac
 done
 

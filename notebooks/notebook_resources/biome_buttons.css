@@ -1,0 +1,68 @@
+.hide-x-scroll, 
+.hide-x-scroll .widget-box {
+    overflow-x: hidden;
+}
+
+/* Main Button Styling */
+.biome-btn {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 32px;
+    padding: 8px 10px 8px 12px;
+    margin-bottom: 6px;
+    font-size: 11.5px;
+    border-radius: 4px; 
+    
+    background: #23272F; 
+    color: #999999; 
+    
+    border: 1px solid #1A1D23;
+    
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.25);
+    transition: all 0.15s ease-in-out;
+    
+    justify-content: flex-start;
+    text-align: left;
+}
+
+/* Hide the default Jupyter blue focus ring */
+.biome-btn:focus,
+.biome-btn:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Target the internal Jupyter flex container */
+.biome-btn .widget-button-content {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: flex-start; 
+    width: 100%;
+    overflow: hidden;
+}
+
+.biome-btn .widget-button-label {
+    white-space: pre-wrap; 
+    word-wrap: break-word; 
+    text-align: left;      
+    width: 100%;           
+    overflow: visible;
+    text-overflow: clip;
+    display: block;
+    line-height: 1.4;
+}
+
+.biome-btn:hover {
+    background: #303540;
+    color: #DDDDDD;
+    box-shadow: 0 5px 8px rgba(0, 0, 0, 0.4); 
+}
+
+.biome-btn.is-active {
+    background: #3A3F4B; 
+    color: #FFFFFF;
+    border-color: #4A505C;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}

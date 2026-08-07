@@ -1,8 +1,8 @@
 # MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks.
 
-The latest release of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 1.6 billion non-redundant protein records including relevant metagenomics metadata. The visualisation of sets of protein sequences using SSNs is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
+The latest release of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 1.6 billion non-redundant protein sequences including relevant metagenomics metadata. The visualisation of sets of protein sequences using Sequence Similarity Networks(SSNs) is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
 
-To achieve this, MiSSN automates the network generation process. It uses pre-clustering to reduce sequence redundancy before computing alignments. The network data is enriched with [*GOLD Ecosystem Classification paths*](https://gold.jgi.doe.gov/ecosystem_classification) and [*Pfam accessions*](https://www.ebi.ac.uk/interpro/entry/pfam/), resulting in a context-rich tool for the exploration of MGnify proteins.
+To achieve this, MiSSN automates the network generation process. It uses pre-clustering to reduce sequence redundancy before computing all-vs-all pairwise alignments. The network is annotated with [*GOLD biome classifications*](https://gold.jgi.doe.gov/ecosystem_classification) and [*Pfam accessions*](https://www.ebi.ac.uk/interpro/entry/pfam/), resulting in a context-rich tool for the exploration of MGnify Proteins sequence clusters.
 
 # Workflow
 
@@ -69,7 +69,7 @@ The pipeline consists of four major steps:
 1. **Pre-clustering:** Utilizing MMseqs2 (`easy-linclust`) to perform linear-time clustering on the input dataset using **minimum sequence identity** (`-i`) and **minimum coverage** (`-c`) thresholds, reducing sequence redundancy before computing alignments.
 2. **Separation:** Filtering the clustering results by a **minimum cluster size** (`-s`) and splitting the retained groups into individual FASTA files.
 3. **Calculating all-vs-all alignments**: Running DIAMOND `blastp` on each separated cluster to compute all-vs-all pairwise sequence alignments, outputting the edge lists for the networks.
-4. **Building the SSNs**: Filtering the edge lists by the same **minimum sequence identity** and **minimum coverage** thresholds, then enriching the network nodes with metadata—specifically *GOLD Ecosystem Classification paths* and *Pfam accessions*—to generate the final network edge and node Parquet files. This step calculates node colors using the **color group parts** (`-g`) parameter, which controls how many levels deep into the biome hierarchy base colors are assigned (with deeper sub-biomes inheriting shades of their parent).
+4. **Building the SSNs**: Filtering the edge lists by the same **minimum sequence identity** and **minimum coverage** thresholds, then enriching the network nodes with metadata—specifically *GOLD biome classifications* and *Pfam accessions*—to generate the final network edge and node Parquet files. This step calculates node colors using the **color group parts** (`-g`) parameter, which controls how many levels deep into the biome hierarchy base colors are assigned (with deeper sub-biomes inheriting shades of their parent).
 
 > [!NOTE]
 > **Why we filter twice:** MMseqs2 `easy-linclust` relies on a fast, heuristic algorithm to achieve linear-time scaling. While highly efficient for initial dataset reduction, its sequence identity and coverage boundaries are only approximate. Applying the exact same thresholds again in to the precise DIAMOND alignments guarantees that the final network edges strictly enforce the defined parameters.

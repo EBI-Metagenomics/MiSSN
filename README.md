@@ -34,7 +34,7 @@ flowchart TD
     O@{ shape: rect}
 
     %% Connections / Flow
-    A -- <br> --> B
+    A --> B
     B --> D
     D --> F
     D --> G

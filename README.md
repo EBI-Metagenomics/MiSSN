@@ -14,17 +14,17 @@ config:
 flowchart TD
     %% Node Definitions
     A["dataset.fasta"]
-    B["MMseqs2 linclust<br>linclust.sh<br>"]
+    B["MMseqs2 linclust\nlinclust.sh"]
     C["dataset_biome_annotations.parquet"]
-    D["linclust_results/<br>dataset_cluster.tsv"]
-    E["separated_clusters/<br>FASTA per cluster"]
-    F["Cluster size distribution notebook<br>visualise_size_distribution.ipynb"]
+    D["linclust_results/\ndataset_cluster.tsv"]
+    E["separated_clusters/\nFASTA per cluster"]
+    F["Cluster size distribution notebook\nvisualise_size_distribution.ipynb"]
     G["separate_clusters.py"]
-    H["DIAMOND blastp<br>all-vs-all.sh"]
-    I["cluster_alignments/<br>TSV edge list<br>per cluster"]
+    H["DIAMOND blastp\nall-vs-all.sh"]
+    I["cluster_alignments/\nTSV edge list\nper cluster"]
     K["build_ssn.py"]
-    M["networks/<br>edges.parquet<br>nodes.parquet<br>per cluster"]
-    N["SSN visualisation notebook<br>visualise_ssn.ipynb"]
+    M["networks/\nedges.parquet\nnodes.parquet\nper cluster"]
+    N["SSN visualisation notebook\nvisualise_ssn.ipynb"]
     O["dataset_pfam_annotations.parquet"]
 
     %% Shapes

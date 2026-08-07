@@ -1,6 +1,6 @@
 # MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks.
 
-The latest release of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 1.6 billion non-redundant protein sequences including relevant metagenomics metadata. The visualisation of sets of protein sequences using Sequence Similarity Networks(SSNs) is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
+The [latest release](https://ebi-metagenomics.github.io/blog/2026/07/17/MGnify-Proteins-Release/) of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 5.7 billion non-redundant protein sequences, with over 1.6 billion cluster representatives including relevant metagenomics metadata. The visualisation of sets of protein sequences using Sequence Similarity Networks(SSNs) is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
 
 To achieve this, MiSSN automates the network generation process. It uses pre-clustering to reduce sequence redundancy before computing all-vs-all pairwise alignments. The network is annotated with [*GOLD biome classifications*](https://gold.jgi.doe.gov/ecosystem_classification) and [*Pfam accessions*](https://www.ebi.ac.uk/interpro/entry/pfam/), resulting in a context-rich tool for the exploration of MGnify Proteins sequence clusters.
 
@@ -21,7 +21,7 @@ flowchart TD
     F["Cluster size distribution notebook\nvisualise_size_distribution.ipynb"]
     G["separate_clusters.py"]
     H["DIAMOND blastp\nall-vs-all.sh"]
-    I["cluster_alignments/\nTSV edge list\nper cluster"]
+    I["cluster_alignments/\nTSV pairwise alignments\nper cluster"]
     K["build_ssn.py"]
     M["networks/\nedges.parquet\nnodes.parquet\nper cluster"]
     N["SSN visualisation notebook\nvisualise_ssn.ipynb"]
@@ -72,7 +72,7 @@ The pipeline consists of four major steps:
 4. **Building the SSNs**: Filtering the edge lists by the same **minimum sequence identity** and **minimum coverage** thresholds, then enriching the network nodes with metadata—specifically *GOLD biome classifications* and *Pfam accessions*—to generate the final network edge and node Parquet files. This step calculates node colors using the **color group parts** (`-g`) parameter, which controls how many levels deep into the biome hierarchy base colors are assigned (with deeper sub-biomes inheriting shades of their parent).
 
 > [!NOTE]
-> **Why we filter twice:** MMseqs2 `easy-linclust` relies on a fast, heuristic algorithm to achieve linear-time scaling. While highly efficient for initial dataset reduction, its sequence identity and coverage boundaries are only approximate. Applying the exact same thresholds again in to the precise DIAMOND alignments guarantees that the final network edges strictly enforce the defined parameters.
+> **Why we filter twice:** MMseqs2 `easy-linclust` relies on a fast, heuristic algorithm to achieve linear-time scaling. While highly efficient for initial dataset reduction, its sequence identity and coverage boundaries are only approximate. Moreover, it only aligns sequences against their cluster representative, meaning it does not compute the all-vs-all pairwise identities required to build a complete graph. Running DIAMOND on the separated clusters calculates those missing all-vs-all connections, and applying the same thresholds again guarantees that the final network edges strictly enforce your defined parameters.
 
 The generated SSNs can be visualised using Jupyter notebooks found under the `/notebooks` directory. We provide the following interactive environments to tune your parameters and help you analyze your data:
 
@@ -122,6 +122,14 @@ You can run the full pipeline using the following command:
 ./MiSSN.sh -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
 ```
 
+**Example**
+
+This command runs the pipeline on the provided FASTA and metadata files, establishing network edges between sequences that share at least 40% sequence identity and 80% alignment coverage, and only extracting clusters that contain 5 or more members. The results will be generated under the `example_dataset/` directory.
+
+```bash
+./MiSSN.sh -f example_dataset.fasta.gz -m example_dataset_biome_annotations.parquet -i 0.4 -c 0.8 -s 5
+```
+
 ## Inputs
 
 ### Required arguments
@@ -129,6 +137,12 @@ You can run the full pipeline using the following command:
 - `-f <fasta_file>`: Path to the input protein sequence file in FASTA format (`.fasta`, `.fa`, `.faa`), supporting gzip-compressed inputs (`.gz`).
 
 - `-m <metadata_file>`: Path to the metadata file containing biome annotations, provided in Apache Parquet (`.parquet`) format.
+
+  **Example**
+  | mgyp | biome |
+  | :--- | :---  |
+  | MGYP007687434724 | root:Host-associated:Birds:Digestive system |
+  | MGYP003341907928 | root:Environmental:Aquatic:Marine:Oceanic |
 
 - `-i <min_seq_id>`: Minimum sequence identity threshold required to keep an edge between nodes in the network, specified as a decimal float from `0.0` to `1.0`.
 
@@ -142,6 +156,10 @@ You can run the full pipeline using the following command:
 
 - `-g <color_group_parts>`: Number of leading levels of the biome lineage to use for grouping and color-coding nodes within the network visualization. (Default: `4`).
 
+  **Example**
+  
+  If set to `4`, a biome of `root:Engineered:Solid waste:Composting:Bioreactor` is is grouped under `root:Engineered:Solid waste:Composting` to determine its base color.
+
 - `-h`: Display the help message and exit the program. 
 
 > [!IMPORTANT]
@@ -153,17 +171,19 @@ The filenames are prefixed with the sequence ID of the cluster's representative 
 
 - `<cluster_rep>_nodes.parquet`: Contains the node attributes for the specific cluster, including the sequence IDs, biome lineage, colors (based on the biomes), and Pfam annotations.
 
-| id | biome | color | pfam |
-| :--- | :--- | :--- | :--- |
-| MGYP010172319147 | root:Environmental:Aquatic:Freshwater | rgb(75,221,153) | TBA |
-| MGYP000588563658 | root:Environmental:Aquatic:Estuary:Sediment | rgb(121,226,168)| TBA |
+  **Example**
+  | id | biome | color | pfam |
+  | :--- | :--- | :--- | :--- |
+  | MGYP010172319147 | root:Environmental:Aquatic:Freshwater | rgb(75,221,153) | TBA |
+  | MGYP000588563658 | root:Environmental:Aquatic:Estuary:Sediment | rgb(121,226,168)| TBA |
 
 - `<cluster_rep>_edge.parquet`: Contains the network edges between the sequences in that cluster, including sequence identity.
 
-| source | target | sequence identity |
-| :--- | :--- | :--- |
-| MGYP010172319147 | MGYP011046998155 | 77.2 |
-| MGYP000588563658 | MGYP010172319147 | 78.1 |
+  **Example**
+  | source | target | sequence identity |
+  | :--- | :--- | :--- |
+  | MGYP010172319147 | MGYP011046998155 | 77.2 |
+  | MGYP000588563658 | MGYP010172319147 | 78.1 |
 
 > [!TIP]
 > These output files are formatted ready for visualization. You can load them directly into the provided `visualise_ssn.ipynb` notebook, or import them into the Cosmograph web app or Cytoscape.

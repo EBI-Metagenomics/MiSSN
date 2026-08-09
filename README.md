@@ -1,6 +1,6 @@
 # MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks.
 
-The [latest release](https://ebi-metagenomics.github.io/blog/2026/07/17/MGnify-Proteins-Release/) of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 5.7 billion non-redundant protein sequences, with over 1.6 billion cluster representatives including relevant metagenomics metadata. The visualisation of sets of protein sequences using Sequence Similarity Networks(SSNs) is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
+The [latest release](https://ebi-metagenomics.github.io/blog/2026/07/17/MGnify-Proteins-Release/) of the [MGnify Proteins Database](https://www.ebi.ac.uk/metagenomics/proteins/) contains over 5.7 billion non-redundant protein sequences, with over 1.6 billion cluster representatives including relevant metagenomics metadata. The visualisation of sets of protein sequences using Sequence Similarity Networks (SSNs) is a common approach for extracting novel insights about protein-protein relationships, including functional, structural, and evolutionary hypotheses.
 
 To achieve this, MiSSN automates the network generation process. It uses pre-clustering to reduce sequence redundancy before computing all-vs-all pairwise alignments. The network is annotated with [*GOLD biome classifications*](https://gold.jgi.doe.gov/ecosystem_classification) and [*Pfam accessions*](https://www.ebi.ac.uk/interpro/entry/pfam/), resulting in a context-rich tool for the exploration of MGnify Proteins sequence clusters.
 
@@ -119,7 +119,7 @@ cd MiSSN
 You can run the full pipeline using the following command:
 
 ```bash
-./MiSSN.sh -f <fasta_file> -m <metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
+./MiSSN.sh -f <fasta_file> -b <biome_metadata_file> -p <pfam_metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
 ```
 
 **Example**
@@ -127,7 +127,13 @@ You can run the full pipeline using the following command:
 This command runs the pipeline on the provided FASTA and metadata files, establishing network edges between sequences that share at least 40% sequence identity and 80% alignment coverage, and only extracting clusters that contain 5 or more members. The results will be generated under the `example_dataset/` directory.
 
 ```bash
-./MiSSN.sh -f example_dataset.fasta.gz -m example_dataset_biome_annotations.parquet -i 0.4 -c 0.8 -s 5
+./MiSSN.sh \
+  -f example_dataset.fasta.gz \
+  -b example_dataset_biome_annotations.parquet \
+  -p example_dataset_pfam_annotations.parquet \
+  -i 0.4 \
+  -c 0.8 \
+  -s 5
 ```
 
 ## Inputs
@@ -136,13 +142,21 @@ This command runs the pipeline on the provided FASTA and metadata files, establi
 
 - `-f <fasta_file>`: Path to the input protein sequence file in FASTA format (`.fasta`, `.fa`, `.faa`), supporting gzip-compressed inputs (`.gz`).
 
-- `-m <metadata_file>`: Path to the metadata file containing biome annotations, provided in Apache Parquet (`.parquet`) format.
+- `-b <biome_metadata_file>`: Path to the metadata file containing biome annotations, provided in Apache Parquet (`.parquet`) format.
 
   **Example**
   | mgyp | biome |
   | :--- | :---  |
   | MGYP007687434724 | root:Host-associated:Birds:Digestive system |
   | MGYP003341907928 | root:Environmental:Aquatic:Marine:Oceanic |
+
+- `-p <pfam_metadata_file>`: Path to the metadata file containing Pfam accessions, provided in Apache Parquet (`.parquet`) format.
+
+  **Example**
+  | mgyp | pfam_accession |
+  | :--- | :---  |
+  | MGYP000084156255 | PF22721 |
+  | MGYP000117404121 | PF00756 |
 
 - `-i <min_seq_id>`: Minimum sequence identity threshold required to keep an edge between nodes in the network, specified as a decimal float from `0.0` to `1.0`.
 
@@ -172,10 +186,13 @@ The filenames are prefixed with the sequence ID of the cluster's representative 
 - `<cluster_rep>_nodes.parquet`: Contains the node attributes for the specific cluster, including the sequence IDs, biome lineage, colors (based on the biomes), and Pfam annotations.
 
   **Example**
-  | id | biome | color | pfam |
+  | id | biome | pfam_accession | color |
   | :--- | :--- | :--- | :--- |
-  | MGYP010172319147 | root:Environmental:Aquatic:Freshwater | rgb(75,221,153) | TBA |
-  | MGYP000588563658 | root:Environmental:Aquatic:Estuary:Sediment | rgb(121,226,168)| TBA |
+  | MGYP007520866722 | root:Environmental:Terrestrial:Soil:Contaminated | PF13604 | rgb(121,216,226) |
+  | MGYP001245521661 | root:Engineered:Wastewater:Activated Sludge | PF22721 | rgb(118,221,75) |
+
+> [!NOTE]
+> If a protein sequence has multiple biomes or Pfam accessions, the values are concatenated into a single string separated by semicolons, like `A;B`. We assume every sequence has at least one biome classification, but if a protein does not have any Pfam accessions, the pfam_accession value simply defaults to the string 'None'.
 
 - `<cluster_rep>_edge.parquet`: Contains the network edges between the sequences in that cluster, including sequence identity.
 

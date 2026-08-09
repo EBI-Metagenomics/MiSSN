@@ -174,25 +174,44 @@ def build_color_table(lineages, group_parts=3):
     return ordered
 
 
-def setup_database(metadata_file):
+def setup_database(biome_metadata_file, pfam_metadata_file):
     """
-    Initializes DuckDB and loads the global metadata file into it, sorting
-    biomes before aggregation.
+    Initializes DuckDB to build the global nodes table by aggregating
+    sorted GOLD biomes and joining their corresponding Pfam accessions.
     """
     conn = duckdb.connect()
 
-    print(f"[{time.strftime('%H:%M:%S')}] Loading metadata into DuckDB...")
+    print(f"[{time.strftime('%H:%M:%S')}] Loading biome metadata into DuckDB...")
     conn.execute(f"""
-    CREATE TABLE global_nodes AS
+    CREATE TEMP TABLE temp_biome AS
     SELECT
         mgyp AS id,
         -- Sorts the unique biomes alphabetically before joining them with ';'
         -- ensuring 'A;B' and 'B;A' both become 'A;B'
-        string_agg(DISTINCT biome, ';' ORDER BY biome) AS biome,
-        -- Sorts all other metadata column values alphabetically too before joining them with ';'
-        string_agg(DISTINCT COLUMNS(* EXCLUDE(mgyp, biome))::VARCHAR, ';' ORDER BY COLUMNS(* EXCLUDE(mgyp, biome))::VARCHAR)
-    FROM read_parquet('{metadata_file.as_posix()}')
+        string_agg(DISTINCT biome, ';' ORDER BY biome) AS biome
+    FROM read_parquet('{biome_metadata_file.as_posix()}')
     GROUP BY mgyp
+    """)
+
+    print(f"[{time.strftime('%H:%M:%S')}] Loading Pfam accessions into DuckDB...")
+
+    conn.execute(f"""
+    CREATE TEMP TABLE temp_pfam AS
+    SELECT
+        mgyp AS id,
+        string_agg(DISTINCT pfam_accession, ';' ORDER BY pfam_accession) AS pfam_accession
+    FROM read_parquet('{pfam_metadata_file.as_posix()}')
+    GROUP BY mgyp
+    """)
+
+    # Join the Pfam table with the metadata nodes
+    conn.execute("""
+    CREATE TABLE global_nodes AS
+    SELECT
+        b.*,
+        COALESCE(p.pfam_accession, 'None') AS pfam_accession
+    FROM temp_biome b
+    LEFT JOIN temp_pfam p ON b.id = p.id
     """)
 
     return conn
@@ -316,12 +335,18 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
 
 
 def process_networks(
-    edge_list_dir, metadata_file, min_seq_id, min_coverage, group_parts, out_dir
+    edge_list_dir,
+    biome_metadata_file,
+    pfam_metadata_file,
+    min_seq_id,
+    min_coverage,
+    group_parts,
+    out_dir,
 ):
     """Process TSV edge lists using DuckDB to generate node and edge parquet files."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    conn = setup_database(metadata_file)
+    conn = setup_database(biome_metadata_file, pfam_metadata_file)
     setup_biome_colors(conn, group_parts)
 
     tsv_files = list(edge_list_dir.glob("*.tsv")) + list(edge_list_dir.glob("*.tsv.gz"))
@@ -362,11 +387,18 @@ if __name__ == "__main__":
         help="Directory containing edge lists",
     )
     parser.add_argument(
-        "-m",
-        "--metadata-file",
+        "-b",
+        "--biome-metadata-file",
         type=Path,
         required=True,
-        help="Path to the global metadata Parquet file",
+        help="Path to the Parquet file containing the GOLD biome classifications",
+    )
+    parser.add_argument(
+        "-p",
+        "--pfam-metadata-file",
+        type=Path,
+        required=True,
+        help="Path to the Parquet file containing Pfam accessions",
     )
     parser.add_argument(
         "-i",
@@ -405,7 +437,8 @@ if __name__ == "__main__":
 
     process_networks(
         edge_list_dir=args.edge_list_dir,
-        metadata_file=args.metadata_file,
+        biome_metadata_file=args.biome_metadata_file,
+        pfam_metadata_file=args.pfam_metadata_file,
         min_seq_id=args.min_seq_id,
         min_coverage=args.min_coverage,
         group_parts=args.color_group_parts,

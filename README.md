@@ -192,7 +192,7 @@ The filenames are prefixed with the sequence ID of the cluster's representative 
   | MGYP001245521661 | root:Engineered:Wastewater:Activated Sludge | PF22721 | rgb(118,221,75) |
 
 > [!NOTE]
-> If a protein sequence has multiple biomes or Pfam accessions, the values are concatenated into a single string separated by semicolons, like `A;B`. We assume every sequence has at least one biome classification, but if a protein does not have any Pfam accessions, the pfam_accession value simply defaults to the string 'None'.
+> If a protein sequence has multiple biomes or Pfam accessions, the values are concatenated into a single string separated by semicolons, like `A;B`. We assume every sequence has at least one biome classification, but if a protein does not have any Pfam accessions, the pfam_accession value simply defaults to the string `None`.
 
 - `<cluster_rep>_edge.parquet`: Contains the network edges between the sequences in that cluster, including sequence identity.
 

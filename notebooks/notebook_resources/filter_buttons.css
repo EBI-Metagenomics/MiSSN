@@ -4,7 +4,7 @@
 }
 
 /* Main Button Styling */
-.biome-btn {
+.filter-btn {
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
@@ -28,14 +28,14 @@
 }
 
 /* Hide the default Jupyter blue focus ring */
-.biome-btn:focus,
-.biome-btn:active {
+.filter-btn:focus,
+.filter-btn:active {
     outline: none !important;
     box-shadow: none !important;
 }
 
 /* Target the internal Jupyter flex container */
-.biome-btn .widget-button-content {
+.filter-btn .widget-button-content {
     box-sizing: border-box;
     display: flex;
     justify-content: flex-start; 
@@ -43,7 +43,7 @@
     overflow: hidden;
 }
 
-.biome-btn .widget-button-label {
+.filter-btn .widget-button-label {
     white-space: pre-wrap; 
     word-wrap: break-word; 
     text-align: left;      
@@ -54,13 +54,13 @@
     line-height: 1.4;
 }
 
-.biome-btn:hover {
+.filter-btn:hover {
     background: #303540;
     color: #DDDDDD;
     box-shadow: 0 5px 8px rgba(0, 0, 0, 0.4); 
 }
 
-.biome-btn.is-active {
+.filter-btn.is-active {
     background: #3A3F4B; 
     color: #FFFFFF;
     border-color: #4A505C;

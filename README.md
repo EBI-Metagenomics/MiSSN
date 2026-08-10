@@ -76,9 +76,9 @@ The pipeline consists of four major steps:
 
 The generated SSNs can be visualised using Jupyter notebooks found under the `/notebooks` directory. We provide the following interactive environments to tune your parameters and help you analyze your data:
 
-1. **Cluster size distribution notebook** (`visualise_size_distribution.ipynb`): This notebook is designed to analyze the cluster size distribution, helping you accurately set or adjust the `<min_cluster_size>` parameter for the main pipeline.
+- **Cluster size distribution notebook** (`visualise_size_distribution.ipynb`): This notebook is designed to analyze the cluster size distribution, helping you accurately set or adjust the `<min_cluster_size>` parameter for the main pipeline.
 
-2. **SSN visualisation notebook** (`visualise_ssn.ipynb`): An interactive environment to load the generated `.parquet` network files, explore the sequence similarity networks visually, and interactively filter nodes by their biome and Pfam annotations.
+- **SSN visualisation notebook** (`visualise_ssn.ipynb`): An interactive environment to load the generated `.parquet` network files, explore the sequence similarity networks visually, and interactively filter nodes by their biome and Pfam annotations.
 
 # Requirements
 

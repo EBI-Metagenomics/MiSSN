@@ -14,3 +14,9 @@ networks
 
 # Jupyter notebooks
 .ipynb_checkpoints/
+
+# Test files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+settings.json

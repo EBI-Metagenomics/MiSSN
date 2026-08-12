@@ -1,16 +1,22 @@
-dataset
-tmp
+# Output directories
 cluster_alignments
 linclust_results
 separated_clusters
-plots
 networks
 
+# Data files
 *.fasta
 *.csv
 *.tsv
 *.parquet
-*.png
 *.dmnd
+*.gz
 
-diamond
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Test files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+settings.json

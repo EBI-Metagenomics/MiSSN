@@ -83,7 +83,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-t",
-        "--tsv-file",
+        "--cluster-tsv-file",
         type=Path,
         required=True,
         help="Path to the cluster mapping TSV file",
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-s",
-        "--min-size",
+        "--min-cluster-size",
         type=lambda x: (
             int(x)
             if int(x) >= 0
@@ -110,7 +110,9 @@ if __name__ == "__main__":
     out_dir = args.out_dir / "separated_clusters"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    seq_to_cluster, valid_clusters = load_cluster_mapping(args.tsv_file, args.min_size)
+    seq_to_cluster, valid_clusters = load_cluster_mapping(
+        args.cluster_tsv_file, args.min_cluster_size
+    )
     cluster_data = group_sequences(args.fasta_file, seq_to_cluster, valid_clusters)
     write_cluster_files(cluster_data, out_dir)
 

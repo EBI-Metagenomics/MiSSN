@@ -5,22 +5,25 @@
 #SBATCH --mem=50G
 
 export DIAMOND_THREADS=${SLURM_CPUS_PER_TASK:-1}
+DIAMOND_IMG=""
+
 MAX_CLUSTERS=0
 
-while getopts "f:o:m:" option; do
+while getopts "f:o:m:d:" option; do
   case $option in
-    f) FASTA_DIR=$OPTARG ;;
-    o) OUT_DIR=$OPTARG ;;
-    m) MAX_CLUSTERS=$OPTARG ;;
-    *)
-      echo "Usage: sbatch $0 -f <fasta_dir> -o <out_dir> [-m max_clusters]" >&2
-      exit 1
-      ;;
+  f) FASTA_DIR=$OPTARG ;;
+  o) OUT_DIR=$OPTARG ;;
+  m) MAX_CLUSTERS=$OPTARG ;;
+  d) DIAMOND_IMG=$OPTARG ;;
+  *)
+    echo "Usage: sbatch $0 -f <fasta_dir> -o <out_dir> -d <diamond_img_path> [-m max_clusters]" >&2
+    exit 1
+    ;;
   esac
 done
 
-if [ -z "$FASTA_DIR" ] || [ -z "$OUT_DIR" ]; then
-  echo "Usage: sbatch $0 -f <fasta_dir> -o <out_dir>" >&2
+if [ -z "$FASTA_DIR" ] || [ -z "$OUT_DIR" ] || [ -z "$DIAMOND_IMG" ]; then
+  echo "Usage: sbatch $0 -f <fasta_dir> -o <out_dir> -d <diamond_img_path> [-m max_clusters]" >&2
   exit 1
 fi
 
@@ -29,23 +32,30 @@ if [ ! -d "$FASTA_DIR" ]; then
   exit 1
 fi
 
+if [ ! -f "$DIAMOND_IMG" ]; then
+  echo "Error: Singularity image '$DIAMOND_IMG' not found." >&2
+  exit 1
+fi
+
 mkdir -p "$OUT_DIR"
+
+export DIAMOND_IMG
 
 run_diamond() {
   local FASTA_FILE=$1
-  
+
   # Get the filename and safely strip the extension (.fasta, .fa, .faa)
   local FILENAME=$(basename "$FASTA_FILE")
   local CLUSTER_NAME="${FILENAME%.*}"
 
-  singularity run "$SINGULARITY_IMG" diamond makedb \
+  singularity run "$DIAMOND_IMG" diamond makedb \
     --in "$FASTA_FILE" \
     --db "$OUT_DIR/${CLUSTER_NAME}" \
     --threads "$DIAMOND_THREADS" \
     --quiet
 
   # Run all-vs-all blastp
-  singularity run "$SINGULARITY_IMG" diamond blastp \
+  singularity run "$DIAMOND_IMG" diamond blastp \
     --query "$FASTA_FILE" \
     --db "$OUT_DIR/${CLUSTER_NAME}.dmnd" \
     --out "$OUT_DIR/${CLUSTER_NAME}.tsv" \
@@ -69,7 +79,7 @@ PROCESSED=0
 # Loop through possible FASTA extensions
 for file in "$FASTA_DIR"/*.{fasta,fa,faa}; do
   [ -e "$file" ] || continue
-  
+
   if [ "$MAX_CLUSTERS" -gt 0 ] && [ "$PROCESSED" -ge "$MAX_CLUSTERS" ]; then
     echo "Reached maximum limit of $MAX_CLUSTERS clusters. Stopping alignment."
     break

@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=100G
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 if [ -f "$SLURM_SUBMIT_DIR/scripts/build_ssn.py" ]; then
   PYTHON_SCRIPT="$SLURM_SUBMIT_DIR/scripts/build_ssn.py"
 elif [ -f "$SLURM_SUBMIT_DIR/../scripts/build_ssn.py" ]; then
@@ -14,23 +14,24 @@ else
   exit 1
 fi
 
-while getopts "e:m:o:i:c:g:" option; do
+while getopts "e:b:p:o:i:c:g:" option; do
   case $option in
-    e) EDGE_LIST_DIR=$OPTARG ;;
-    m) METADATA_FILE=$OPTARG ;;
-    o) OUT_DIR=$OPTARG ;;
-    i) MIN_SEQ_ID=$OPTARG ;;
-    c) MIN_COVERAGE=$OPTARG ;;
-    g) GROUP_PARTS=$OPTARG ;;
-    *)
-      echo "Usage: sbatch $0 -e <edge_list_dir> -m <metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
-      exit 1
-      ;;
+  e) EDGE_LIST_DIR=$OPTARG ;;
+  b) BIOME_METADATA_FILE=$OPTARG ;;
+  p) PFAM_METADATA_FILE=$OPTARG ;;
+  o) OUT_DIR=$OPTARG ;;
+  i) MIN_SEQ_ID=$OPTARG ;;
+  c) MIN_COVERAGE=$OPTARG ;;
+  g) GROUP_PARTS=$OPTARG ;;
+  *)
+    echo "Usage: sbatch $0 -e <edge_list_dir> -b <biome_metadata_file> -p <pfam_metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
+    exit 1
+    ;;
   esac
 done
 
-if [ -z "$EDGE_LIST_DIR" ] || [ -z "$METADATA_FILE" ] || [ -z "$OUT_DIR" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ]; then
-  echo "Usage: sbatch $0 -e <edge_list_dir> -m <metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
+if [ -z "$EDGE_LIST_DIR" ] || [ -z "$BIOME_METADATA_FILE" ] || [ -z "$PFAM_METADATA_FILE" ] || [ -z "$OUT_DIR" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ]; then
+  echo "Usage: sbatch $0 -e <edge_list_dir> -b <biome_metadata_file> -p <pfam_metadata_file> -o <out_dir> -i <min_seq_id> -c <min_coverage> [-g <group_parts>]" >&2
   exit 1
 fi
 
@@ -39,8 +40,13 @@ if [ ! -d "$EDGE_LIST_DIR" ]; then
   exit 1
 fi
 
-if [ ! -f "$METADATA_FILE" ]; then
-  echo "Error: Metadata file '$METADATA_FILE' not found." >&2
+if [ ! -f "$BIOME_METADATA_FILE" ]; then
+  echo "Error: Biome metadata file '$BIOME_METADATA_FILE' not found." >&2
+  exit 1
+fi
+
+if [ ! -f "$PFAM_METADATA_FILE" ]; then
+  echo "Error: Pfam metadata file '$PFAM_METADATA_FILE' not found." >&2
   exit 1
 fi
 
@@ -50,7 +56,8 @@ if [ -n "$GROUP_PARTS" ]; then
   # If -g was provided
   python3 "$PYTHON_SCRIPT" \
     -e "$EDGE_LIST_DIR" \
-    -m "$METADATA_FILE" \
+    -b "$BIOME_METADATA_FILE" \
+    -p "$PFAM_METADATA_FILE" \
     -o "$OUT_DIR" \
     -i "$MIN_SEQ_ID" \
     -c "$MIN_COVERAGE" \
@@ -59,7 +66,8 @@ else
   # If -g was NOT provided Python will use its default
   python3 "$PYTHON_SCRIPT" \
     -e "$EDGE_LIST_DIR" \
-    -m "$METADATA_FILE" \
+    -b "$BIOME_METADATA_FILE" \
+    -p "$PFAM_METADATA_FILE" \
     -o "$OUT_DIR" \
     -i "$MIN_SEQ_ID" \
     -c "$MIN_COVERAGE"

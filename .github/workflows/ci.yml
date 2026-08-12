@@ -41,7 +41,7 @@ jobs:
             python-version: "3.13"
             activate-environment: missn
             environment-file: environment.yml
-            auto-activate-base: false
+            auto-activate: false
 
         - name: Run Pytest
           shell: bash -el {0}

@@ -35,12 +35,12 @@ jobs:
           uses: actions/checkout@v7
 
         - name: Set up Conda environment
-          uses: conda-incubator/setup-miniconda@v3
+          uses: conda-incubator/setup-miniconda@v4
           with:
             auto-update-conda: true
             python-version: "3.13"
-            activate-environment: missn
-            environment-file: environment.yml
+            activate-environment: ci-missn
+            environment-file: .github/workflows/ci-environment.yml
             auto-activate-base: false
 
         - name: Run Pytest

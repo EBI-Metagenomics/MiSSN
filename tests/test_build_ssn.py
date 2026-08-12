@@ -78,6 +78,9 @@ def test_setup_database(mock_metadata):
     
     df = conn.execute("SELECT * FROM global_nodes ORDER BY id").df()
     
+    # Verify the expected columns are present
+    assert set(df.columns) == {"id", "biome", "pfam_accession"}
+    
     # Check aggregation and joining (3 unique IDs)
     assert len(df) == 3
     
@@ -165,6 +168,9 @@ def test_process_single_network(tmp_path, mock_metadata):
 
     edges_df = pd.read_parquet(edges_file)
     assert len(edges_df) == 1
+    
+    assert (edges_df["source"] != edges_df["target"]).all()
+    
     assert set(edges_df.iloc[0][["source", "target"]]) == {"MGYP001342377832", "MGYP001208449037"}
 
     nodes_df = pd.read_parquet(nodes_file)

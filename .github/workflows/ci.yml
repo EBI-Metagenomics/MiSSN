@@ -39,8 +39,8 @@ jobs:
           with:
             auto-update-conda: true
             python-version: "3.13"
-            activate-environment: ci-missn
-            environment-file: .github/workflows/ci-environment.yml
+            activate-environment: missn
+            environment-file: environment.yml
             auto-activate-base: false
 
         - name: Run Pytest

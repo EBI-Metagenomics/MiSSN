@@ -13,8 +13,8 @@ jobs:
     name: Ruff linter
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,3 +26,24 @@ jobs:
 
       - name: Run Ruff
         run: ruff check .
+
+  test:
+      name: Run Pytest tests
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v7
+
+        - name: Set up Conda environment
+          uses: conda-incubator/setup-miniconda@v3
+          with:
+            auto-update-conda: true
+            python-version: "3.13"
+            activate-environment: missn
+            environment-file: environment.yml
+            auto-activate-base: false
+
+        - name: Run Pytest
+          shell: bash -el {0}
+          run: |
+            python -m pytest tests/

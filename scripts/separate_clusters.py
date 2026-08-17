@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-from Bio.SeqIO.FastaIO import SimpleFastaParser
-from collections import defaultdict
 import gzip
-from pathlib import Path
 import time
+from collections import defaultdict
+from pathlib import Path
+
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 
 def open_text(filepath):

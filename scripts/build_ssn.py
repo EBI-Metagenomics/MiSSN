@@ -2,10 +2,11 @@
 
 import argparse
 import colorsys
-import duckdb
-from pathlib import Path
-import pandas as pd
 import time
+from pathlib import Path
+
+import duckdb
+import pandas as pd
 
 
 def clean_lineage(raw):
@@ -19,7 +20,7 @@ def clean_lineage(raw):
 
 
 class TreeNode:
-    __slots__ = ("name", "children", "hue", "hue_span", "depth", "is_lineage")
+    __slots__ = ("children", "depth", "hue", "hue_span", "is_lineage", "name")
 
     def __init__(self, name, depth):
         self.name = name

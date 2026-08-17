@@ -1,0 +1,49 @@
+name: CI pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Ruff linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff
+        run: ruff check .
+
+  test:
+      name: Run Pytest tests
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v7
+
+        - name: Set up Conda environment
+          uses: conda-incubator/setup-miniconda@v4
+          with:
+            auto-update-conda: true
+            python-version: "3.13"
+            activate-environment: missn
+            environment-file: environment.yml
+            auto-activate: false
+
+        - name: Run Pytest
+          shell: bash -el {0}
+          run: |
+            python -m pytest tests/

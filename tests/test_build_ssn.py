@@ -1,12 +1,12 @@
-import pytest
 import pandas as pd
+import pytest
 
 from scripts.build_ssn import (
     build_tree,
-    setup_database,
-    setup_biome_colors,
-    process_single_network,
     process_networks,
+    process_single_network,
+    setup_biome_colors,
+    setup_database,
 )
 
 

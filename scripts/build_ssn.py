@@ -258,8 +258,9 @@ def setup_biome_colors(conn, group_parts):
 
 def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
     """
-    Processes an edge list, filters by min_seq_id and min_coverage, and
-    extracts nodes and edges to Parquet files.
+    Processes an edge list, requiring min_seq_id and min_coverage on both
+    sequences per HSP, and extracts nodes and edges to Parquet files.
+    DIAMOND's qcovhsp and scovhsp fields are percentages (0 to 100).
     """
     base_name = tsv_path.name.replace(".tsv.gz", "").replace(".tsv", "")
 
@@ -282,7 +283,9 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
                 'slen',
                 'positive',
                 'evalue',
-                'bitscore'
+                'bitscore',
+                'qcovhsp',
+                'scovhsp'
             ]
         )
         """)
@@ -302,7 +305,7 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
     FROM raw_edges
     WHERE qseqid != sseqid
     AND pident >= {min_seq_id} * 100
-    AND positive >= {min_coverage} * GREATEST(qlen, slen)
+    AND LEAST(qcovhsp, scovhsp) >= {min_coverage} * 100
     GROUP BY source, target;
     """)
 
@@ -413,7 +416,7 @@ if __name__ == "__main__":
         "--min-coverage",
         type=valid_fraction("min-coverage"),
         required=True,
-        help="Minimum alignment coverage threshold to keep an edge (0.0 to 1.0)",
+        help="Minimum per-HSP coverage of both sequences to keep an edge (0.0 to 1.0)",
     )
     parser.add_argument(
         "-g",

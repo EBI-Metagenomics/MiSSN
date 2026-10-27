@@ -160,7 +160,7 @@ This command runs the pipeline on the provided FASTA and metadata files, establi
 
 - `-i <min_seq_id>`: Minimum sequence identity threshold required to keep an edge between nodes in the network, specified as a decimal float from `0.0` to `1.0`.
 
-- `-c <min_coverage>`: Minimum alignment coverage threshold required to keep an edge between nodes in the network, specified as a decimal float from `0.0` to `1.0`.
+- `-c <min_coverage>`: Minimum per-HSP alignment coverage required for both proteins to keep an edge between nodes in the network, specified as a decimal float from `0.0` to `1.0`. For example, `0.8` requires DIAMOND's `qcovhsp` and `scovhsp` to both be at least `80` percent. Regenerate older nine-column alignment TSVs with `scripts/all-vs-all.sh` to include these coverage fields.
 
 - `-s <min_cluster_size>`: Minimum number of connected members required within a component to extract and output a distinct cluster.
 

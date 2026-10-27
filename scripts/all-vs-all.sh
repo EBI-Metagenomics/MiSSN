@@ -32,11 +32,13 @@ run_diamond() {
     --db "$OUT_DIR/${CLUSTER_NAME}" \
     --quiet
 
+  # Keep the output field order in sync with build_ssn.py.
+  # qcovhsp/scovhsp report per-HSP coverage as percentages (0 to 100).
   diamond blastp \
     --query "$FASTA_FILE" \
     --db "$OUT_DIR/${CLUSTER_NAME}.dmnd" \
     --out "$OUT_DIR/${CLUSTER_NAME}.tsv" \
-    --outfmt 6 qseqid sseqid pident length qlen slen positive evalue bitscore \
+    --outfmt 6 qseqid sseqid pident length qlen slen positive evalue bitscore qcovhsp scovhsp \
     -k 0 \
     --no-self-hits \
     --fast \

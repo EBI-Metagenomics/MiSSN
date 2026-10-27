@@ -135,17 +135,17 @@ def test_process_single_network(tmp_path, mock_metadata):
     # Create a mock DIAMOND output TSV
     tsv_file = tmp_path / "cluster.tsv"
     tsv_content = (
-        # 1. Valid edge (pident 87.4% >= 40%, coverage: 350 / 427 = 82.0% >= 80%)
-        "MGYP001208449037\tMGYP001342377832\t87.4\t286\t427\t296\t350\t6.73e-186\t512.0\n"
+        # 1. Valid edge: both coverages >= 80%, despite fewer positive matches.
+        "MGYP001208449037\tMGYP001342377832\t87.4\t250\t300\t296\t230\t6.73e-186\t512.0\t83.3\t84.5\n"
                 
-        # 2. Fails min_seq_id (pident 30.0% < 40%, coverage: 350 / 427 = 82.0% >= 80%)
-        "MGYP001208449037\tMGYP006224946903\t30.0\t167\t427\t168\t350\t7.27e-66\t201.0\n"    
+        # 2. Fails min_seq_id (30% < 40%), despite sufficient coverage.
+        "MGYP001208449037\tMGYP006224946903\t30.0\t150\t180\t168\t100\t7.27e-66\t201.0\t83.3\t89.3\n"
         
-        # 3. Fails min_coverage (pident 90.0% >= 40%, coverage: 50 / 427 = 11.7% < 80%)
-        "MGYP001208449037\tMGYP006224946903\t90.0\t100\t427\t168\t50\t1e-5\t200.0\n"
+        # 3. Fails min_coverage (both below 80%, but above 0.8).
+        "MGYP001208449037\tMGYP006224946903\t90.0\t100\t427\t168\t95\t1e-5\t200.0\t23.4\t59.5\n"
         
         # 4. Self loop (should be removed by the SQL logic)
-        "MGYP001342377832\tMGYP001342377832\t100.0\t296\t296\t296\t296\t0.0\t500.0\n"
+        "MGYP001342377832\tMGYP001342377832\t100.0\t296\t296\t296\t296\t0.0\t500.0\t100\t100\n"
     )
     tsv_file.write_text(tsv_content)
     
@@ -188,11 +188,11 @@ def test_integration_process_networks(tmp_path, mock_metadata):
     edge_dir = tmp_path / "edges"
     edge_dir.mkdir()
         
-    # cluster_A valid edge: (pident 87.4 >= 40%, coverage: 350 / 427 = 82.0% >= 80%)
-    (edge_dir / "cluster_A.tsv").write_text("MGYP001208449037\tMGYP001342377832\t87.4\t286\t427\t296\t350\t6.73e-186\t512.0\n")
+    # cluster_A valid edge: pident >= 40%, both coverages >= 80%.
+    (edge_dir / "cluster_A.tsv").write_text("MGYP001208449037\tMGYP001342377832\t87.4\t250\t300\t296\t230\t6.73e-186\t512.0\t83.3\t84.5\n")
     
-    # cluster_B valid edge: (pident 85.0 >= 40%, coverage: 350 / 427 = 82.0% >= 80%)
-    (edge_dir / "cluster_B.tsv").write_text("MGYP001208449037\tMGYP006224946903\t85.0\t150\t427\t168\t350\t1e-80\t250.0\n")
+    # cluster_B valid edge: pident >= 40%, both coverages >= 80%.
+    (edge_dir / "cluster_B.tsv").write_text("MGYP001208449037\tMGYP006224946903\t85.0\t150\t180\t168\t140\t1e-80\t250.0\t83.3\t89.3\n")
     
     out_dir = tmp_path / "networks"
     
@@ -210,3 +210,32 @@ def test_integration_process_networks(tmp_path, mock_metadata):
     assert (out_dir / "cluster_A" / "cluster_A_edges.parquet").exists()
     assert (out_dir / "cluster_B" / "cluster_B_nodes.parquet").exists()
     assert (out_dir / "cluster_B" / "cluster_B_edges.parquet").exists()
+
+    for cluster in ("cluster_A", "cluster_B"):
+        assert len(pd.read_parquet(out_dir / cluster / f"{cluster}_edges.parquet")) == 1
+
+
+@pytest.mark.parametrize(
+    "qcovhsp, scovhsp, expected_edges",
+    [
+        (80, 80, 1),  # Inclusive threshold; positive matches alone would fail.
+        (79.9, 100, 0),  # Subject coverage cannot rescue low query coverage.
+        (100, 79.9, 0),  # Query coverage cannot rescue low subject coverage.
+        (1, 1, 0),  # Percentages must be compared with 80, not 0.8.
+    ],
+)
+def test_coverage_threshold(tmp_path, mock_metadata, qcovhsp, scovhsp, expected_edges):
+    biome_metadata_file, pfam_metadata_file = mock_metadata
+    conn = setup_database(biome_metadata_file, pfam_metadata_file)
+    setup_biome_colors(conn, group_parts=3)
+    tsv_file = tmp_path / "coverage.tsv"
+    tsv_file.write_text(
+        "MGYP001208449037\tMGYP001342377832\t50\t1000\t1000\t1000\t500\t1e-80\t250"
+        f"\t{qcovhsp}\t{scovhsp}\n"
+    )
+
+    process_single_network(conn, tsv_file, tmp_path / "networks", 0.4, 0.8)
+
+    edges = pd.read_parquet(tmp_path / "networks" / "coverage" / "coverage_edges.parquet")
+    assert len(edges) == expected_edges
+    conn.close()

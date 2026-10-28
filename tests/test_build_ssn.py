@@ -313,13 +313,23 @@ def shell_pipeline(tmp_path):
         f"#!{sys.executable}\nimport json, os, sys\n"
         "with open(os.environ['MISSN_TEST_ARG_LOG'], 'w') as handle:\n"
         "    json.dump(sys.argv[1:], handle)\n"
+        "sys.exit(int(os.environ.get('MISSN_TEST_BUILD_EXIT', '0')))\n"
     )
     builder.chmod(0o755)
+    merger = scripts / "build_metanetwork.py"
+    merger.write_text(
+        "import json, os, sys\n"
+        "assert os.path.exists(os.environ['MISSN_TEST_ARG_LOG'])\n"
+        "with open(os.environ['MISSN_TEST_MERGE_LOG'], 'w') as handle:\n"
+        "    json.dump(sys.argv[1:], handle)\n"
+        "sys.exit(int(os.environ.get('MISSN_TEST_MERGE_EXIT', '0')))\n"
+    )
     fasta = root / "input sequences.fasta"
     fasta.write_text(">A\nAAAA\n")
     command = ["bash", str(root / "MiSSN.sh"), "-f", str(fasta), "-i", "0.4",
                "-c", "0.8", "-s", "2", "-o", str(root / "output directory")]
-    env = {**os.environ, "MISSN_TEST_ARG_LOG": str(log)}
+    env = {**os.environ, "MISSN_TEST_ARG_LOG": str(log),
+           "MISSN_TEST_MERGE_LOG": str(tmp_path / "merge_arguments.json")}
     return command, env, log
 
 
@@ -345,6 +355,47 @@ def test_shell_optional_metadata(shell_pipeline, tmp_path, use_biome, use_pfam, 
     assert forwarded["-i"] == "0.4"
     assert forwarded["-c"] == "0.8"
     assert forwarded["-o"].endswith("output directory/networks")
+    assert not Path(env["MISSN_TEST_MERGE_LOG"]).exists()
+
+
+@pytest.mark.parametrize("position", [2, 6, 12], ids=["before", "between", "after"])
+def test_shell_metanetwork(shell_pipeline, position):
+    command, env, log = shell_pipeline
+    command.insert(position, "--metanetwork")
+    subprocess.run(command, env=env, check=True, capture_output=True, text=True)
+    build_args = json.loads(log.read_text())
+    build_output = dict(zip(build_args[::2], build_args[1::2]))["-o"]
+    merge_args = json.loads(Path(env["MISSN_TEST_MERGE_LOG"]).read_text())
+    assert merge_args == ["-o", str(Path(build_output).parent)]
+
+
+@pytest.mark.parametrize("merge_enabled", [False, True])
+def test_shell_build_failure(shell_pipeline, merge_enabled):
+    command, env, log = shell_pipeline
+    env["MISSN_TEST_BUILD_EXIT"] = "7"
+    if merge_enabled:
+        command.append("--metanetwork")
+    result = subprocess.run(command, env=env, check=False, capture_output=True, text=True)
+    assert result.returncode == 7
+    assert log.exists()
+    assert not Path(env["MISSN_TEST_MERGE_LOG"]).exists()
+
+
+def test_shell_merge_failure(shell_pipeline):
+    command, env, _ = shell_pipeline
+    env["MISSN_TEST_MERGE_EXIT"] = "9"
+    result = subprocess.run(command + ["--metanetwork"], env=env, check=False,
+                            capture_output=True, text=True)
+    assert result.returncode == 9
+    assert Path(env["MISSN_TEST_MERGE_LOG"]).exists()
+
+
+@pytest.mark.parametrize("flag", ["--unknown", "--metanetwork=true"])
+def test_shell_rejects_unknown_long_options(shell_pipeline, flag):
+    command, env, log = shell_pipeline
+    result = subprocess.run(command + [flag], env=env, check=False, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert not log.exists()
 
 
 @pytest.mark.parametrize("flag", ["-b", "-p", "-C"])

@@ -121,7 +121,7 @@ cd MiSSN
 You can run the full pipeline using the following command:
 
 ```bash
-./MiSSN.sh -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
+./MiSSN.sh -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>] [--metanetwork]
 ```
 
 **Example**
@@ -155,6 +155,18 @@ The builder can also run directly on existing alignment files; its metadata opti
 ```bash
 python scripts/build_ssn.py -e cluster_alignments -i 0.4 -c 0.8 -o networks \
   --color-metadata-file example_colors.parquet
+```
+
+**With a metanetwork**
+
+```bash
+./MiSSN.sh -f example_dataset.fasta.gz -i 0.4 -c 0.8 -s 5 -o example_output --metanetwork
+```
+
+To merge an existing pipeline run, pass its output directory (the parent of `networks`):
+
+```bash
+python scripts/build_metanetwork.py --out-dir example_output
 ```
 
 ## Inputs
@@ -206,6 +218,8 @@ Biome, Pfam, and colour metadata are independently optional; supply any combinat
   
   If set to `4`, a biome of `root:Engineered:Solid waste:Composting:Bioreactor` is is grouped under `root:Engineered:Solid waste:Composting` to determine its base color.
 
+- `--metanetwork`: After building the cluster SSNs, concatenate all cluster nodes and all cluster edges into two additional Parquet files at the root of the output directory.
+
 - `-h`: Display the help message and exit the program. 
 
 > [!IMPORTANT]
@@ -235,6 +249,27 @@ Nodes are the distinct query and subject IDs present in each raw alignment file,
   | :--- | :--- | :--- |
   | MGYP010172319147 | MGYP011046998155 | 77.2 |
   | MGYP000588563658 | MGYP010172319147 | 78.1 |
+
+### Metanetwork outputs
+
+When `--metanetwork` is supplied, the output layout is:
+
+```text
+<out_dir>/
+├── metanetwork_nodes.parquet
+├── metanetwork_edges.parquet
+└── networks/
+    ├── <cluster_rep_1>/
+    │   ├── <cluster_rep_1>_nodes.parquet
+    │   └── <cluster_rep_1>_edges.parquet
+    └── <cluster_rep_2>/
+        ├── <cluster_rep_2>_nodes.parquet
+        └── <cluster_rep_2>_edges.parquet
+```
+
+The metanetwork files concatenate every row from `networks/*/*_nodes.parquet` and `networks/*/*_edges.parquet`, respectively, preserving the existing columns, annotations, colours, and duplicate rows. No deduplication or aggregation is performed. Cluster files remain unchanged. Running the standalone merger again replaces the two metanetwork files without including previous merged outputs as inputs.
+
+The merger requires the `networks` directory and at least one matching file of each kind. Valid empty Parquets are accepted; missing inputs, malformed Parquets, and incompatible schemas cause an error and a nonzero exit status. Without `--metanetwork`, the pipeline produces only the usual cluster outputs.
 
 > [!TIP]
 > These output files can be imported into the Cosmograph web app or Cytoscape. Updates to the provided `visualise_ssn.ipynb` notebook are deferred: its current annotation filters exclude null values and may hide unannotated nodes, and its biome filter swatches assume one colour per biome.

@@ -2,7 +2,7 @@
 # MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
 
 usage() {
-  echo "Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]" >&2
+  echo "Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>] [--metanetwork]" >&2
   echo "Try '$0 -h' for more information." >&2
   exit 1
 }
@@ -11,7 +11,7 @@ print_help() {
   cat <<EOF
 MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
 
-Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
+Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>] [--metanetwork]
 
 Required arguments:
   -f    Path to the input FASTA file (can be .gz).
@@ -25,6 +25,7 @@ Optional arguments:
   -C    Parquet file with accession and color columns; overrides biome colors.
   -o    Output directory. (Default: dynamically named based on the FASTA file).
   -g    Number of leading lineage parts for color grouping. (Default: 4).
+  --metanetwork    Merge cluster nodes and edges into metanetwork Parquets in the output root.
   -h    Show this help message and exit.
 EOF
 
@@ -34,8 +35,9 @@ EOF
 BIOME_METADATA_FILE=""
 PFAM_METADATA_FILE=""
 COLOR_METADATA_FILE=""
+METANETWORK=false
 
-while getopts "f:b:p:C:i:c:s:o:g:h" option; do
+while getopts "f:b:p:C:i:c:s:o:g:h-:" option; do
   case $option in
   f) FASTA_FILE=$OPTARG ;;
   b) [ -n "$OPTARG" ] || usage; BIOME_METADATA_FILE=$OPTARG ;;
@@ -47,6 +49,12 @@ while getopts "f:b:p:C:i:c:s:o:g:h" option; do
   o) OUT_DIR=$OPTARG ;;
   g) COLOR_GROUP_PARTS=$OPTARG ;;
   h) print_help ;;
+  -)
+    case $OPTARG in
+      metanetwork) METANETWORK=true ;;
+      *) usage ;;
+    esac
+    ;;
   *) usage ;;
   esac
 done
@@ -153,4 +161,8 @@ if [ -n "$COLOR_METADATA_FILE" ]; then
   BUILD_ARGS+=(-C "$COLOR_METADATA_FILE")
 fi
 
-"$SCRIPT_DIR/scripts/build_ssn.py" "${BUILD_ARGS[@]}"
+"$SCRIPT_DIR/scripts/build_ssn.py" "${BUILD_ARGS[@]}" || exit $?
+
+if [ "$METANETWORK" = true ]; then
+  python3 "$SCRIPT_DIR/scripts/build_metanetwork.py" -o "$OUT_DIR" || exit $?
+fi

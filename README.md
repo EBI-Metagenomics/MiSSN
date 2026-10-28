@@ -272,7 +272,7 @@ The metanetwork files concatenate every row from `networks/*/*_nodes.parquet` an
 The merger requires the `networks` directory and at least one matching file of each kind. Valid empty Parquets are accepted; missing inputs, malformed Parquets, and incompatible schemas cause an error and a nonzero exit status. Without `--metanetwork`, the pipeline produces only the usual cluster outputs.
 
 > [!TIP]
-> These output files can be imported into the Cosmograph web app or Cytoscape. Updates to the provided `visualise_ssn.ipynb` notebook are deferred: its current annotation filters exclude null values and may hide unannotated nodes, and its biome filter swatches assume one colour per biome.
+> These output files are formatted ready for visualization. You can load them directly into the provided `visualise_ssn.ipynb` notebook, or import them into the Cosmograph web app or Cytoscape.
 
 # Resources
 

@@ -2,7 +2,7 @@
 # MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
 
 usage() {
-  echo "Usage: $0 -f <fasta_file> -b <biome_metadata_file> -p <pfam_metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]" >&2
+  echo "Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]" >&2
   echo "Try '$0 -h' for more information." >&2
   exit 1
 }
@@ -11,17 +11,18 @@ print_help() {
   cat <<EOF
 MiSSN: A workflow for generating MGnify interactive Sequence Similarity Networks
 
-Usage: $0 -f <fasta_file> -b <biome_metadata_file> -p <pfam_metadata_file> -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
+Usage: $0 -f <fasta_file> [-b <biome_metadata_file>] [-p <pfam_metadata_file>] [-C <color_metadata_file>] -i <min_seq_id> -c <min_coverage> -s <min_cluster_size> [-o <out_dir>] [-g <color_group_parts>]
 
 Required arguments:
   -f    Path to the input FASTA file (can be .gz).
-  -b    Path to the GOLD biome classifications Parquet file.
-  -p    Path to the Pfam accessions Parquet file.
   -i    Minimum sequence identity threshold to keep an edge (0.0 to 1.0).
   -c    Minimum alignment coverage threshold to keep an edge (0.0 to 1.0).
   -s    Minimum number of members required to extract a cluster.
 
 Optional arguments:
+  -b    Path to the GOLD biome classifications Parquet file.
+  -p    Path to the Pfam accessions Parquet file.
+  -C    Parquet file with accession and color columns; overrides biome colors.
   -o    Output directory. (Default: dynamically named based on the FASTA file).
   -g    Number of leading lineage parts for color grouping. (Default: 4).
   -h    Show this help message and exit.
@@ -30,11 +31,16 @@ EOF
   exit 0
 }
 
-while getopts "f:b:p:i:c:s:o:g:h" option; do
+BIOME_METADATA_FILE=""
+PFAM_METADATA_FILE=""
+COLOR_METADATA_FILE=""
+
+while getopts "f:b:p:C:i:c:s:o:g:h" option; do
   case $option in
   f) FASTA_FILE=$OPTARG ;;
-  b) BIOME_METADATA_FILE=$OPTARG ;;
-  p) PFAM_METADATA_FILE=$OPTARG ;;
+  b) [ -n "$OPTARG" ] || usage; BIOME_METADATA_FILE=$OPTARG ;;
+  p) [ -n "$OPTARG" ] || usage; PFAM_METADATA_FILE=$OPTARG ;;
+  C) [ -n "$OPTARG" ] || usage; COLOR_METADATA_FILE=$OPTARG ;;
   i) MIN_SEQ_ID=$OPTARG ;;
   c) MIN_COVERAGE=$OPTARG ;;
   s) MIN_CLUSTER_SIZE=$OPTARG ;;
@@ -45,7 +51,7 @@ while getopts "f:b:p:i:c:s:o:g:h" option; do
   esac
 done
 
-if [ -z "$FASTA_FILE" ] || [ -z "$BIOME_METADATA_FILE" ] || [ -z "$PFAM_METADATA_FILE" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ] || [ -z "$MIN_CLUSTER_SIZE" ]; then
+if [ -z "$FASTA_FILE" ] || [ -z "$MIN_SEQ_ID" ] || [ -z "$MIN_COVERAGE" ] || [ -z "$MIN_CLUSTER_SIZE" ]; then
   usage
 fi
 
@@ -54,13 +60,18 @@ if [ ! -f "$FASTA_FILE" ]; then
   exit 1
 fi
 
-if [ ! -f "$BIOME_METADATA_FILE" ]; then
+if [ -n "$BIOME_METADATA_FILE" ] && [ ! -f "$BIOME_METADATA_FILE" ]; then
   echo "Error: Biome metadata file '$BIOME_METADATA_FILE' not found." >&2
   exit 1
 fi
 
-if [ ! -f "$PFAM_METADATA_FILE" ]; then
+if [ -n "$PFAM_METADATA_FILE" ] && [ ! -f "$PFAM_METADATA_FILE" ]; then
   echo "Error: Pfam metadata file '$PFAM_METADATA_FILE' not found." >&2
+  exit 1
+fi
+
+if [ -n "$COLOR_METADATA_FILE" ] && [ ! -f "$COLOR_METADATA_FILE" ]; then
+  echo "Error: Color metadata file '$COLOR_METADATA_FILE' not found." >&2
   exit 1
 fi
 
@@ -125,11 +136,21 @@ NETWORKS_DIR="$OUT_DIR/networks"
   -f "$SEPARATED_CLUSTERS_DIR" \
   -o "$CLUSTER_ALIGNMENTS_DIR"
 
-"$SCRIPT_DIR/scripts/build_ssn.py" \
-  -e "$CLUSTER_ALIGNMENTS_DIR" \
-  -b "$BIOME_METADATA_FILE" \
-  -p "$PFAM_METADATA_FILE" \
-  -i "$MIN_SEQ_ID" \
-  -c "$MIN_COVERAGE" \
-  -o "$NETWORKS_DIR" \
+BUILD_ARGS=(
+  -e "$CLUSTER_ALIGNMENTS_DIR"
+  -i "$MIN_SEQ_ID"
+  -c "$MIN_COVERAGE"
+  -o "$NETWORKS_DIR"
   -g "$COLOR_GROUP_PARTS"
+)
+if [ -n "$BIOME_METADATA_FILE" ]; then
+  BUILD_ARGS+=(-b "$BIOME_METADATA_FILE")
+fi
+if [ -n "$PFAM_METADATA_FILE" ]; then
+  BUILD_ARGS+=(-p "$PFAM_METADATA_FILE")
+fi
+if [ -n "$COLOR_METADATA_FILE" ]; then
+  BUILD_ARGS+=(-C "$COLOR_METADATA_FILE")
+fi
+
+"$SCRIPT_DIR/scripts/build_ssn.py" "${BUILD_ARGS[@]}"

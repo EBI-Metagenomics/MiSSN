@@ -2,6 +2,7 @@
 
 import argparse
 import colorsys
+import re
 import time
 from pathlib import Path
 
@@ -175,45 +176,79 @@ def build_color_table(lineages, group_parts=3):
     return ordered
 
 
-def setup_database(biome_metadata_file, pfam_metadata_file):
-    """
-    Initializes DuckDB to build the global nodes table by aggregating
-    sorted GOLD biomes and joining their corresponding Pfam accessions.
-    """
+def normalize_color(value):
+    """Validate a hex or RGB colour and return the canonical RGB string."""
+    value = value.strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        channels = tuple(int(value[i:i + 2], 16) for i in (1, 3, 5))
+    else:
+        match = re.fullmatch(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", value)
+        if not match:
+            raise ValueError(f"Invalid color {value!r}: expected #RRGGBB or rgb(r,g,b)")
+        channels = tuple(int(channel) for channel in match.groups())
+        if any(channel > 255 for channel in channels):
+            raise ValueError(f"Invalid color {value!r}: RGB channels must be 0–255")
+    return "rgb({},{},{})".format(*channels)
+
+
+def setup_accession_colors(conn, color_metadata_file):
+    """Load and validate overrides once; enforce one colour per accession."""
+    conn.execute("CREATE TEMP TABLE accession_colors (id VARCHAR, color VARCHAR)")
+    if color_metadata_file is None:
+        return
+    rows = conn.execute(
+        "SELECT * FROM read_parquet(?) LIMIT 0", [str(color_metadata_file)]
+    )
+    columns = {column[0]: column[1] for column in rows.description}
+    for name in ("accession", "color"):
+        if name not in columns or str(columns[name]) != "VARCHAR":
+            raise ValueError(f"Color metadata requires a string column named {name!r}")
+    # Fetch only the two required columns, even if the input has extra fields.
+    records = conn.execute(
+        "SELECT accession, color FROM read_parquet(?)", [str(color_metadata_file)]
+    ).fetchall()
+    colors = {}
+    for accession, color in records:
+        if accession is None or not accession.strip() or color is None or not color.strip():
+            raise ValueError("Color metadata accession and color must not be null or blank")
+        normalized = normalize_color(color)
+        if accession in colors and colors[accession] != normalized:
+            raise ValueError(f"Conflicting colors for accession {accession!r}")
+        colors[accession] = normalized
+    if colors:
+        conn.executemany("INSERT INTO accession_colors VALUES (?, ?)", list(colors.items()))
+
+
+def setup_database(biome_metadata_file=None, pfam_metadata_file=None, color_metadata_file=None):
+    """Aggregate optional annotations and load accession colour overrides."""
     conn = duckdb.connect()
+    try:
+        for table, column, path in (
+            ("temp_biome", "biome", biome_metadata_file),
+            ("temp_pfam", "pfam_accession", pfam_metadata_file),
+        ):
+            conn.execute(f"CREATE TEMP TABLE {table} (id VARCHAR, {column} VARCHAR)")
+            if path is not None:
+                print(f"[{time.strftime('%H:%M:%S')}] Loading {column} metadata into DuckDB...")
+                conn.execute(f"""
+                    INSERT INTO {table}
+                    SELECT mgyp, string_agg(DISTINCT {column}, ';' ORDER BY {column})
+                    FROM read_parquet(?) GROUP BY mgyp
+                """, [str(path)])
 
-    print(f"[{time.strftime('%H:%M:%S')}] Loading biome metadata into DuckDB...")
-    conn.execute(f"""
-    CREATE TEMP TABLE temp_biome AS
-    SELECT
-        mgyp AS id,
-        -- Sorts the unique biomes alphabetically before joining them with ';'
-        -- ensuring 'A;B' and 'B;A' both become 'A;B'
-        string_agg(DISTINCT biome, ';' ORDER BY biome) AS biome
-    FROM read_parquet('{biome_metadata_file.as_posix()}')
-    GROUP BY mgyp
-    """)
-
-    print(f"[{time.strftime('%H:%M:%S')}] Loading Pfam accessions into DuckDB...")
-
-    conn.execute(f"""
-    CREATE TEMP TABLE temp_pfam AS
-    SELECT
-        mgyp AS id,
-        string_agg(DISTINCT pfam_accession, ';' ORDER BY pfam_accession) AS pfam_accession
-    FROM read_parquet('{pfam_metadata_file.as_posix()}')
-    GROUP BY mgyp
-    """)
-
-    # Join the Pfam table with the metadata nodes
-    conn.execute("""
-    CREATE TABLE global_nodes AS
-    SELECT
-        b.*,
-        COALESCE(p.pfam_accession, 'None') AS pfam_accession
-    FROM temp_biome b
-    LEFT JOIN temp_pfam p ON b.id = p.id
-    """)
+        conn.execute("""
+            CREATE TABLE global_nodes AS
+            SELECT
+                COALESCE(b.id, p.id) AS id,
+                b.biome,
+                p.pfam_accession
+            FROM temp_biome b
+            FULL OUTER JOIN temp_pfam p ON b.id = p.id
+        """)
+        setup_accession_colors(conn, color_metadata_file)
+    except Exception:
+        conn.close()
+        raise
 
     return conn
 
@@ -274,6 +309,7 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
             header=false,
             delim='\\t',
             auto_detect=true,
+            types={{'qseqid': 'VARCHAR', 'sseqid': 'VARCHAR'}},
             names=[
                 'qseqid',
                 'sseqid',
@@ -313,15 +349,18 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
     conn.execute("""
     CREATE OR REPLACE TEMP TABLE active_nodes AS
     SELECT
-        g.*,
-        COALESCE(c.color, 'rgb(200, 200, 200)') AS color
-    FROM global_nodes g
-    SEMI JOIN (
-        SELECT qseqid AS id FROM raw_edges
+        a.id,
+        g.biome,
+        g.pfam_accession,
+        COALESCE(o.color, c.color, 'rgb(200, 200, 200)') AS color
+    FROM (
+        SELECT CAST(qseqid AS VARCHAR) AS id FROM raw_edges
         UNION
-        SELECT sseqid AS id FROM raw_edges
-    ) a ON g.id = a.id
+        SELECT CAST(sseqid AS VARCHAR) AS id FROM raw_edges
+    ) a
+    LEFT JOIN global_nodes g ON g.id = a.id
     LEFT JOIN biome_color_map c ON g.biome = c.biome
+    LEFT JOIN accession_colors o ON a.id = o.id
     """)
 
     # Export Cosmograph edges and nodes
@@ -346,20 +385,20 @@ def process_networks(
     min_coverage,
     group_parts,
     out_dir,
+    color_metadata_file=None,
 ):
     """Process TSV edge lists using DuckDB to generate node and edge parquet files."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    conn = setup_database(biome_metadata_file, pfam_metadata_file)
-    setup_biome_colors(conn, group_parts)
-
-    tsv_files = list(edge_list_dir.glob("*.tsv")) + list(edge_list_dir.glob("*.tsv.gz"))
-    print(f"\tFound {len(tsv_files)} edge lists to process.")
-
-    for tsv_path in tsv_files:
-        process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage)
-
-    conn.close()
+    conn = setup_database(biome_metadata_file, pfam_metadata_file, color_metadata_file)
+    try:
+        setup_biome_colors(conn, group_parts)
+        tsv_files = list(edge_list_dir.glob("*.tsv")) + list(edge_list_dir.glob("*.tsv.gz"))
+        print(f"\tFound {len(tsv_files)} edge lists to process.")
+        for tsv_path in tsv_files:
+            process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage)
+    finally:
+        conn.close()
     print(
         f"[{time.strftime('%H:%M:%S')}] Successfully exported all files into '{out_dir}'."
     )
@@ -394,15 +433,19 @@ if __name__ == "__main__":
         "-b",
         "--biome-metadata-file",
         type=Path,
-        required=True,
-        help="Path to the Parquet file containing the GOLD biome classifications",
+        help="Optional Parquet file containing the GOLD biome classifications",
     )
     parser.add_argument(
         "-p",
         "--pfam-metadata-file",
         type=Path,
-        required=True,
-        help="Path to the Parquet file containing Pfam accessions",
+        help="Optional Parquet file containing Pfam accessions",
+    )
+    parser.add_argument(
+        "-C",
+        "--color-metadata-file",
+        type=Path,
+        help="Optional Parquet with accession and color columns; overrides biome colors",
     )
     parser.add_argument(
         "-i",
@@ -443,6 +486,7 @@ if __name__ == "__main__":
         edge_list_dir=args.edge_list_dir,
         biome_metadata_file=args.biome_metadata_file,
         pfam_metadata_file=args.pfam_metadata_file,
+        color_metadata_file=args.color_metadata_file,
         min_seq_id=args.min_seq_id,
         min_coverage=args.min_coverage,
         group_parts=args.color_group_parts,

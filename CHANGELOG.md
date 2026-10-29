@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## Unreleased
+Nothing at the moment.
 
 ## [1.1.0] - 2026-10-29
 
@@ -52,5 +53,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   plus Jupyter notebooks for exploring networks and cluster size distributions.
 
 [Unreleased]: https://github.com/EBI-Metagenomics/MiSSN/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/EBI-Metagenomics/MiSSN/compare/v1.0.0...v1.1.0
+[1.1.0]: https://github.com/EBI-Metagenomics/MiSSN/releases/tag/v1.1.0
 [1.0.0]: https://github.com/EBI-Metagenomics/MiSSN/releases/tag/v1.0.0

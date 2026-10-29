@@ -40,5 +40,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preserve numeric-looking sequence identifiers as strings, including leading
   zeroes, so annotation and colour mappings match the original identifiers.
 
+## [1.0.0] - 2026-08-17
+
+### Added
+
+- Initial release of MiSSN, a workflow for generating sequence
+  similarity networks (SSNs) from sets of protein sequences. MiSSN pre-clusters
+  sequences with MMseqs2, calculates within-cluster all-vs-all alignments with
+  DIAMOND/blastp, and builds network files in Parquet format, usable by [Cosmograph](https://cosmograph.app/).
+- Network annotations with GOLD biome classifications and Pfam accessions,
+  plus Jupyter notebooks for exploring networks and cluster size distributions.
+
 [Unreleased]: https://github.com/EBI-Metagenomics/MiSSN/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/EBI-Metagenomics/MiSSN/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/EBI-Metagenomics/MiSSN/releases/tag/v1.0.0

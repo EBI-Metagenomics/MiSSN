@@ -10,9 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Metanetwork generation through the pipeline's `--metanetwork` option.
+- Metanetwork generation through the pipeline's `--metanetwork` option. This option 
+  combines all node parquet files into one, and all edge parquet files into one. Use
+  this option if feasible to get an overview of the sequence similarity patterns across
+  your entire input dataset.
 - Accession-specific node colour overrides through `-C` / `--color-metadata-file`,
   accepting `#RRGGBB` and `rgb(r,g,b)` values and taking precedence over biome colours.
+  This option is especially useful when an _a priori_ separation of the nodes exists,
+  e.g. annotated vs un-annotated sequences, and the user wants to visualise the network
+  with this separation in mind.
 
 ### Changed
 

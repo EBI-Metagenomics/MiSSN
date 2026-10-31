@@ -301,15 +301,15 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
 
     # Load raw edges to capture all sequences
     try:
-        conn.execute(f"""
+        conn.execute("""
         CREATE OR REPLACE TEMP TABLE raw_edges AS
         SELECT *
         FROM read_csv(
-            '{tsv_path.as_posix()}',
+            ?,
             header=false,
             delim='\\t',
             auto_detect=true,
-            types={{'qseqid': 'VARCHAR', 'sseqid': 'VARCHAR'}},
+            types={'qseqid': 'VARCHAR', 'sseqid': 'VARCHAR'},
             names=[
                 'qseqid',
                 'sseqid',
@@ -324,7 +324,7 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
                 'scovhsp'
             ]
         )
-        """)
+        """, [str(tsv_path)])
     except duckdb.InvalidInputException:
         print(f"\tSkipping empty or invalid file: {tsv_path.name}")
         return
@@ -367,9 +367,9 @@ def process_single_network(conn, tsv_path, out_dir, min_seq_id, min_coverage):
     edge_file = network_dir / f"{base_name}_edges.parquet"
     node_file = network_dir / f"{base_name}_nodes.parquet"
 
-    conn.execute(f"COPY unique_edges TO '{edge_file.as_posix()}' (FORMAT PARQUET)")
+    conn.execute("COPY unique_edges TO ? (FORMAT PARQUET)", [str(edge_file)])
 
-    conn.execute(f"COPY active_nodes TO '{node_file.as_posix()}' (FORMAT PARQUET)")
+    conn.execute("COPY active_nodes TO ? (FORMAT PARQUET)", [str(node_file)])
 
     # Cleanup
     conn.execute("DROP TABLE raw_edges")

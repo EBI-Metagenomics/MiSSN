@@ -487,6 +487,26 @@ def test_process_single_network(tmp_path, mock_metadata):
     conn.close()
     
 
+def test_process_single_network_accepts_paths_with_apostrophes(tmp_path):
+    """DuckDB file paths should remain valid when they contain apostrophes."""
+    input_dir = tmp_path / "input's"
+    input_dir.mkdir()
+    tsv_file = input_dir / "cluster's.tsv"
+    tsv_file.write_text(
+        "A\tB\t90\t100\t100\t100\t90\t1e-20\t100\t100\t100\n"
+    )
+
+    conn = setup_database()
+    setup_biome_colors(conn, group_parts=4)
+    output_dir = input_dir / "output's"
+
+    process_single_network(conn, tsv_file, output_dir, 0.4, 0.8)
+
+    assert (output_dir / "cluster's" / "cluster's_edges.parquet").exists()
+    assert (output_dir / "cluster's" / "cluster's_nodes.parquet").exists()
+    conn.close()
+
+
 def test_integration_process_networks(tmp_path, mock_metadata):
     """End-to-end integration test of the main processing loop."""
     biome_metadata_file, pfam_metadata_file = mock_metadata
